@@ -1,0 +1,14 @@
+{
+  "updated_at_utc": "2026-02-19T19:56:10Z",
+  "entries": [
+    {
+      "recorded_at_utc": "2026-02-19T19:56:10Z",
+      "run_id": "22197669412",
+      "sha": "c6c257568e13343e0d2da3bf5508aaa0a7cc7f3e",
+      "ref": "main",
+      "run_summary_dir": "history/runs/20260219T195610Z-run22197669412/summary",
+      "latest_smoke_path": "history/latest/latest-smoke.json",
+      "latest_pyperformance_path": "history/latest/latest-pyperformance.json"
+    }
+  ]
+}

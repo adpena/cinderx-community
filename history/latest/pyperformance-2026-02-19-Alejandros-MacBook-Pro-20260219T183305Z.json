@@ -1,0 +1,156 @@
+{
+  "baseline_runtime": "cpython",
+  "benchmarks": [
+    {
+      "benchmark": "nbody",
+      "compile_time_seconds": null,
+      "mean_seconds": 0.4072887418034952,
+      "memory_rss_bytes": 29540352,
+      "p_value": null,
+      "runtime": "cpython",
+      "runtime_label": "CPython baseline",
+      "sample_count": 20,
+      "speedup_vs_baseline": 1.0,
+      "startup_mean_seconds": 0.050317,
+      "startup_stdev_seconds": 0.0021037766041098567,
+      "stdev_seconds": 0.1238314212818996,
+      "warmup_count": 13,
+      "workload_class": "compute-bound-numeric"
+    }
+  ],
+  "generated_at_utc": "2026-02-19T18:33:05.871667+00:00",
+  "limitations": [
+    "pyperformance coverage can vary by runtime environment and dependency availability; skipped runtimes are recorded explicitly.",
+    "RSS and compile-time fields are optional and only populated when the underlying toolchain reports those metrics."
+  ],
+  "machine": "Alejandros-MacBook-Pro",
+  "metadata": {
+    "generated_at_utc": "2026-02-19T18:33:05.871667+00:00",
+    "guardrails": {
+      "checks": [
+        {
+          "detail": "Affinity API unavailable on this platform.",
+          "enforceable": false,
+          "name": "cpu_affinity",
+          "status": "info"
+        },
+        {
+          "detail": "1m load average: 118.05 (cpu_count=8)",
+          "enforceable": true,
+          "name": "background_load",
+          "status": "warn"
+        },
+        {
+          "detail": "Turbo/boost state is not auto-detected; document manual setting in reports.",
+          "enforceable": false,
+          "name": "turbo_boost",
+          "status": "info"
+        },
+        {
+          "detail": "Thermal throttling is not auto-detected; run after cool-down and note chassis/power profile.",
+          "enforceable": false,
+          "name": "thermal_state",
+          "status": "info"
+        },
+        {
+          "detail": "CI mode enabled: smoke-only quick pass; no public performance claims.",
+          "enforceable": false,
+          "name": "ci_mode",
+          "status": "ok"
+        }
+      ],
+      "enforceable_failures": [
+        "High background load detected; results may be noisy."
+      ]
+    },
+    "host": {
+      "architecture": "arm64",
+      "cpu_logical_count": 8,
+      "cpu_model": "Apple M1",
+      "kernel": "25.2.0",
+      "os": "Darwin",
+      "ram_total_bytes": 8589934592
+    },
+    "machine": "Alejandros-MacBook-Pro",
+    "run_config": {
+      "ci_mode": true,
+      "pyperformance_benchmarks": [
+        "nbody"
+      ],
+      "pyperformance_mode": "fast",
+      "require_cinderx_baseline": false,
+      "startup_samples": 3
+    },
+    "run_id": "20260219T183305Z",
+    "suite": "pyperformance",
+    "toolchain": {
+      "benchmark_repo_sha": "unknown",
+      "cinderx_upstream": {
+        "clone_timestamp_utc": "2026-02-19T15:53:52.396865+00:00",
+        "commit_sha": "31bca9f3156b78cca3c6b36000c42c48f5ddf037",
+        "repo_url": "https://github.com/facebookincubator/cinderx.git"
+      },
+      "pyperformance_command": [
+        "/Users/adpena/PycharmProjects/cinderx-community/.venv/bin/python",
+        "-m",
+        "pyperformance"
+      ],
+      "pyperformance_version": "pyperformance 1.14.0"
+    }
+  },
+  "run_id": "20260219T183305Z",
+  "runtimes": [
+    {
+      "executed": true,
+      "runtime": "cpython",
+      "runtime_details": {
+        "abiflags": "",
+        "build": "('main', 'Feb 12 2026 00:29:58')",
+        "compiler": "Clang 21.1.4 ",
+        "config_args": "'--build=aarch64-apple-darwin' '--host=aarch64-apple-darwin' '--prefix=/install' '--with-openssl=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps' '--with-system-expat' '--with-system-libmpdec' '--without-ensurepip' '--with-tail-call-interp' '--enable-shared' '--with-mimalloc' '--enable-optimizations' '--enable-experimental-jit=yes-off' '--with-lto' '--with-build-python=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/host/bin/python3.14' 'ac_cv_lib_intl_textdomain=no' 'ac_cv_func_ptsname_r=no' 'ac_cv_func_explicit_bzero=no' '--with-dbmliborder=ndbm' 'build_alias=aarch64-apple-darwin' 'host_alias=aarch64-apple-darwin' 'PKG_CONFIG=pkg-config --static' 'PKG_CONFIG_PATH=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps/share/pkgconfig:/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps/lib/pkgconfig' 'CC=clang' 'CFLAGS=-O3 -arch arm64 -mmacosx-version-min=11.0 -Wno-nullability-completeness -Wno-expansion-to-defined -Wno-undef-prefix -fPIC -Werror=unguarded-availability-new' 'LDFLAGS=-arch arm64 -mmacosx-version-min=11.0 -LModules/_hacl -Wl,-headerpad,40' 'CPPFLAGS=-O3 -arch arm64 -mmacosx-version-min=11.0 -Wno-nullability-completeness -Wno-expansion-to-defined -Wno-undef-prefix -fPIC -Werror=unguarded-availability-new' 'PROFILE_TASK=-m test --pgo --ignore test_json'",
+        "implementation": "CPython",
+        "version": "3.14.3"
+      },
+      "runtime_label": "CPython baseline",
+      "runtime_source": "required",
+      "runtime_version": "Python 3.14.3 (main, Feb 12 2026, 00:29:58) [Clang 21.1.4 ]",
+      "startup_mean_seconds": 0.050317,
+      "startup_stdev_seconds": 0.0021037766041098567
+    }
+  ],
+  "skipped_runtimes": [
+    "cpython-cinderx: not provided",
+    "pypy: not provided",
+    "nuitka: not provided",
+    "cython: not provided",
+    "numba: not provided",
+    "codon: not provided"
+  ],
+  "suite": "pyperformance",
+  "workload_taxonomy": [
+    {
+      "class": "interpreter-heavy-dynamic-dispatch",
+      "why_it_matters": "Exercises call overhead, attribute lookup, and frame dispatch where JIT/frame-eval behavior is most visible."
+    },
+    {
+      "class": "compute-bound-numeric",
+      "why_it_matters": "Measures numeric steady-state loops where lowering and optimization quality can dominate."
+    },
+    {
+      "class": "io-bound",
+      "why_it_matters": "Captures filesystem/network style latency where VM speedups may be bounded by system calls."
+    },
+    {
+      "class": "serialization-heavy",
+      "why_it_matters": "Stresses JSON/pickle/msgpack-style payload handling common in services and APIs."
+    },
+    {
+      "class": "web-framework",
+      "why_it_matters": "Represents end-to-end request throughput and latency under realistic framework stacks."
+    },
+    {
+      "class": "c-extension-dominated",
+      "why_it_matters": "Shows optimization ceilings when most cycles occur in native extensions (NumPy/Pandas/etc.)."
+    }
+  ]
+}

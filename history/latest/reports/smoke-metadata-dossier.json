@@ -1,0 +1,73 @@
+{
+  "baseline_runtime": "cpython-cinderx",
+  "generated_at_utc": "2026-02-19T19:54:41.655610+00:00",
+  "machine": "runnervmez679",
+  "metadata": {
+    "generated_at_utc": "2026-02-19T19:54:41.655610+00:00",
+    "guardrails": {
+      "checks": [
+        {
+          "detail": "Visible CPUs: 4 / 4",
+          "enforceable": true,
+          "name": "cpu_affinity",
+          "status": "warn"
+        },
+        {
+          "detail": "1m load average: 0.85 (cpu_count=4)",
+          "enforceable": true,
+          "name": "background_load",
+          "status": "ok"
+        },
+        {
+          "detail": "Turbo/boost state is not auto-detected; document manual setting in reports.",
+          "enforceable": false,
+          "name": "turbo_boost",
+          "status": "info"
+        },
+        {
+          "detail": "Thermal throttling is not auto-detected; run after cool-down and note chassis/power profile.",
+          "enforceable": false,
+          "name": "thermal_state",
+          "status": "info"
+        },
+        {
+          "detail": "CI mode enabled: smoke-only quick pass; no public performance claims.",
+          "enforceable": false,
+          "name": "ci_mode",
+          "status": "ok"
+        }
+      ],
+      "enforceable_failures": [
+        "CPU affinity is not pinned to a restricted core set."
+      ]
+    },
+    "host": {
+      "architecture": "x86_64",
+      "cpu_logical_count": 4,
+      "cpu_model": "AMD EPYC 7763 64-Core Processor",
+      "kernel": "6.8.0-1044-azure",
+      "os": "Linux",
+      "ram_total_bytes": 16767852544
+    },
+    "machine": "runnervmez679",
+    "run_config": {
+      "ci_mode": true,
+      "require_cinderx_baseline": true,
+      "samples": 3,
+      "startup_samples": 3,
+      "warmups": 1
+    },
+    "run_id": "20260219T195441Z",
+    "suite": "smoke",
+    "toolchain": {
+      "benchmark_repo_sha": "c6c257568e13343e0d2da3bf5508aaa0a7cc7f3e",
+      "cinderx_upstream": {
+        "clone_timestamp_utc": "2026-02-19T15:53:52.396865+00:00",
+        "commit_sha": "31bca9f3156b78cca3c6b36000c42c48f5ddf037",
+        "repo_url": "https://github.com/facebookincubator/cinderx.git"
+      }
+    }
+  },
+  "run_id": "20260219T195441Z",
+  "suite": "smoke"
+}
