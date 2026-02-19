@@ -1,22 +1,22 @@
 {
-  "baseline_runtime": "cpython-cinderx",
-  "generated_at_utc": "2026-02-19T19:58:09.269523+00:00",
-  "machine": "runnervmez679",
+  "baseline_runtime": "cpython",
+  "generated_at_utc": "2026-02-19T18:40:31.933974+00:00",
+  "machine": "Alejandros-MacBook-Pro",
   "metadata": {
-    "generated_at_utc": "2026-02-19T19:58:09.269523+00:00",
+    "generated_at_utc": "2026-02-19T18:40:31.933974+00:00",
     "guardrails": {
       "checks": [
         {
-          "detail": "Visible CPUs: 4 / 4",
-          "enforceable": true,
+          "detail": "Affinity API unavailable on this platform.",
+          "enforceable": false,
           "name": "cpu_affinity",
-          "status": "warn"
+          "status": "info"
         },
         {
-          "detail": "1m load average: 0.67 (cpu_count=4)",
+          "detail": "1m load average: 9.92 (cpu_count=8)",
           "enforceable": true,
           "name": "background_load",
-          "status": "ok"
+          "status": "warn"
         },
         {
           "detail": "Turbo/boost state is not auto-detected; document manual setting in reports.",
@@ -38,36 +38,44 @@
         }
       ],
       "enforceable_failures": [
-        "CPU affinity is not pinned to a restricted core set."
+        "High background load detected; results may be noisy."
       ]
     },
     "host": {
-      "architecture": "x86_64",
-      "cpu_logical_count": 4,
-      "cpu_model": "AMD EPYC 7763 64-Core Processor",
-      "kernel": "6.8.0-1044-azure",
-      "os": "Linux",
-      "ram_total_bytes": 16767852544
+      "architecture": "arm64",
+      "cpu_logical_count": 8,
+      "cpu_model": "Apple M1",
+      "kernel": "25.2.0",
+      "os": "Darwin",
+      "ram_total_bytes": 8589934592
     },
-    "machine": "runnervmez679",
+    "machine": "Alejandros-MacBook-Pro",
     "run_config": {
       "ci_mode": true,
-      "require_cinderx_baseline": true,
-      "samples": 3,
-      "startup_samples": 3,
-      "warmups": 1
+      "pyperformance_benchmarks": [
+        "nbody"
+      ],
+      "pyperformance_mode": "fast",
+      "require_cinderx_baseline": false,
+      "startup_samples": 3
     },
-    "run_id": "20260219T195809Z",
-    "suite": "smoke",
+    "run_id": "20260219T184031Z",
+    "suite": "pyperformance",
     "toolchain": {
-      "benchmark_repo_sha": "30f58462e5b78cdb57d65ba8d5041de6b8b8c186",
+      "benchmark_repo_sha": "unknown",
       "cinderx_upstream": {
         "clone_timestamp_utc": "2026-02-19T15:53:52.396865+00:00",
         "commit_sha": "31bca9f3156b78cca3c6b36000c42c48f5ddf037",
         "repo_url": "https://github.com/facebookincubator/cinderx.git"
-      }
+      },
+      "pyperformance_command": [
+        "/Users/adpena/PycharmProjects/cinderx-community/.venv/bin/python",
+        "-m",
+        "pyperformance"
+      ],
+      "pyperformance_version": "pyperformance 1.14.0"
     }
   },
-  "run_id": "20260219T195809Z",
-  "suite": "smoke"
+  "run_id": "20260219T184031Z",
+  "suite": "pyperformance"
 }
