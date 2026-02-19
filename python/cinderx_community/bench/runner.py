@@ -297,7 +297,7 @@ def validate_suite(suite: str) -> None:
 def build_plan(suite: str, python_executable: Path) -> BenchmarkPlan:
     validate_suite(suite)
 
-    path = python_executable.expanduser().resolve()
+    path = Path(os.path.abspath(str(python_executable.expanduser())))
     if not path.exists():
         raise ValueError(f"Python executable does not exist: {path}")
 
@@ -910,7 +910,7 @@ def _guardrail_checks(ci_mode: bool) -> dict[str, Any]:
 def _normalize_path(path: Path | None) -> Path | None:
     if path is None:
         return None
-    return path.expanduser().resolve()
+    return Path(os.path.abspath(str(path.expanduser())))
 
 
 def _runtime_targets(
@@ -966,7 +966,7 @@ def _runtime_targets(
             )
             return
 
-        resolved = executable.expanduser().resolve()
+        resolved = Path(os.path.abspath(str(executable.expanduser())))
         if not resolved.exists():
             targets.append(
                 RuntimeTarget(
@@ -1231,7 +1231,7 @@ def run_smoke_suite(
     sample_count: int | None = None,
     warmup_count: int | None = None,
 ) -> BenchmarkRunResult:
-    baseline_python = python.expanduser().resolve()
+    baseline_python = Path(os.path.abspath(str(python.expanduser())))
     if not baseline_python.exists():
         raise ValueError(f"Python executable does not exist: {baseline_python}")
 
@@ -1793,8 +1793,8 @@ def run_pyperformance_suite(
     codon: Path | None = None,
     static_summary_root: Path | None = None,
 ) -> BenchmarkRunResult:
-    python_hint = python.expanduser()
-    baseline_python = python_hint.resolve()
+    python_hint = Path(os.path.abspath(str(python.expanduser())))
+    baseline_python = Path(os.path.abspath(str(python_hint)))
     if not baseline_python.exists():
         raise ValueError(f"Python executable does not exist: {baseline_python}")
 
