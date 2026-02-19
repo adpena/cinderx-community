@@ -397,26 +397,45 @@ def _available_python_runtime_keys(targets: list[RuntimeTarget]) -> list[str]:
 def _runtime_has_cinderx_support(executable: str) -> bool:
     script = textwrap.dedent(
         """
+        import json
         import platform
         import sys
 
-        has_module = False
+        payload = {
+            "has_module": False,
+            "branded": False,
+            "error": None,
+            "result": False,
+        }
         try:
             import cinderx  # noqa: F401
-            has_module = True
-        except Exception:
-            has_module = False
-        branded = "cinder" in sys.version.lower()
-        if not branded:
-            branded = "cinder" in platform.python_implementation().lower()
-        print("1" if (has_module or branded) else "0")
+            payload["has_module"] = True
+        except BaseException as exc:
+            payload["error"] = f"{type(exc).__name__}: {exc}"
+
+        payload["branded"] = "cinder" in sys.version.lower()
+        if not payload["branded"]:
+            payload["branded"] = "cinder" in platform.python_implementation().lower()
+        payload["result"] = bool(payload["has_module"] or payload["branded"])
+        print(json.dumps(payload))
         """
     ).strip()
     try:
         completed = _run_command([executable, "-c", script], timeout_s=20)
     except ValueError:
         return False
-    return completed.stdout.strip() == "1"
+
+    for line in reversed(completed.stdout.splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return bool(payload.get("result"))
+    return False
 
 
 def _enforce_cinderx_baseline_policy(
