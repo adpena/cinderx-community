@@ -1,6 +1,15 @@
 {
-  "updated_at_utc": "2026-02-19T22:26:31Z",
+  "updated_at_utc": "2026-02-19T22:30:06Z",
   "entries": [
+    {
+      "recorded_at_utc": "2026-02-19T22:30:06Z",
+      "run_id": "22202746458",
+      "sha": "677b4b1622fde95affdc2469661c4d3bcee2d148",
+      "ref": "codex/cinderx-ci-install-probe",
+      "run_summary_dir": "history/runs/20260219T223006Z-run22202746458/summary",
+      "latest_smoke_path": "history/latest/latest-smoke.json",
+      "latest_pyperformance_path": "history/latest/latest-pyperformance.json"
+    },
     {
       "recorded_at_utc": "2026-02-19T22:26:31Z",
       "run_id": "22202638173",

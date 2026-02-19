@@ -4,44 +4,44 @@
     {
       "benchmark": "nbody",
       "compile_time_seconds": null,
-      "mean_seconds": 0.19990241024999733,
+      "mean_seconds": 0.20680949025000075,
       "memory_rss_bytes": null,
-      "p_value": 0.776276223236944,
+      "p_value": 0.8002463984574948,
       "runtime": "cpython",
       "runtime_label": "CPython baseline",
       "sample_count": 20,
-      "speedup_vs_baseline": 1.0031038267584014,
-      "startup_mean_seconds": 0.014823666666666666,
-      "startup_stdev_seconds": 0.00021790900241461673,
-      "stdev_seconds": 0.006635258107681197,
+      "speedup_vs_baseline": 0.9970387570257613,
+      "startup_mean_seconds": 0.025790666666666667,
+      "startup_stdev_seconds": 0.00043796156604584995,
+      "stdev_seconds": 0.005932192670053295,
       "warmup_count": 13,
       "workload_class": "compute-bound-numeric"
     },
     {
       "benchmark": "nbody",
       "compile_time_seconds": null,
-      "mean_seconds": 0.20052287270000022,
-      "memory_rss_bytes": 22548578304,
+      "mean_seconds": 0.20619707709999205,
+      "memory_rss_bytes": null,
       "p_value": null,
       "runtime": "cpython-cinderx",
       "runtime_label": "CPython + CinderX",
       "sample_count": 20,
       "speedup_vs_baseline": 1.0,
-      "startup_mean_seconds": 0.015372666666666666,
-      "startup_stdev_seconds": 0.00023857144282862737,
-      "stdev_seconds": 0.007163546984776976,
+      "startup_mean_seconds": 0.014004,
+      "startup_stdev_seconds": 0.00045197676931453014,
+      "stdev_seconds": 0.009053703482587789,
       "warmup_count": 13,
       "workload_class": "compute-bound-numeric"
     }
   ],
-  "generated_at_utc": "2026-02-19T22:25:50.337367+00:00",
+  "generated_at_utc": "2026-02-19T22:29:18.368472+00:00",
   "limitations": [
     "pyperformance coverage can vary by runtime environment and dependency availability; skipped runtimes are recorded explicitly.",
     "RSS and compile-time fields are optional and only populated when the underlying toolchain reports those metrics."
   ],
   "machine": "runnervmez679",
   "metadata": {
-    "generated_at_utc": "2026-02-19T22:25:50.337367+00:00",
+    "generated_at_utc": "2026-02-19T22:29:18.368472+00:00",
     "guardrails": {
       "checks": [
         {
@@ -85,7 +85,7 @@
       "cpu_model": "AMD EPYC 7763 64-Core Processor",
       "kernel": "6.8.0-1044-azure",
       "os": "Linux",
-      "ram_total_bytes": 16767852544
+      "ram_total_bytes": 16772182016
     },
     "machine": "runnervmez679",
     "run_config": {
@@ -97,10 +97,10 @@
       "require_cinderx_baseline": true,
       "startup_samples": 3
     },
-    "run_id": "20260219T222550Z",
+    "run_id": "20260219T222918Z",
     "suite": "pyperformance",
     "toolchain": {
-      "benchmark_repo_sha": "5c520fb235bf1db983b896eda246c3d8f71aaca9",
+      "benchmark_repo_sha": "677b4b1622fde95affdc2469661c4d3bcee2d148",
       "cinderx_upstream": {
         "clone_timestamp_utc": "2026-02-19T15:53:52.396865+00:00",
         "commit_sha": "31bca9f3156b78cca3c6b36000c42c48f5ddf037",
@@ -114,7 +114,7 @@
       "pyperformance_version": "pyperformance 1.14.0"
     }
   },
-  "run_id": "20260219T222550Z",
+  "run_id": "20260219T222918Z",
   "runtimes": [
     {
       "executed": true,
@@ -130,8 +130,8 @@
       "runtime_label": "CPython baseline",
       "runtime_source": "required",
       "runtime_version": "Python 3.14.0 (main, Oct  7 2025, 13:06:58) [GCC 11.4.0]",
-      "startup_mean_seconds": 0.014823666666666666,
-      "startup_stdev_seconds": 0.00021790900241461673
+      "startup_mean_seconds": 0.025790666666666667,
+      "startup_stdev_seconds": 0.00043796156604584995
     },
     {
       "executed": true,
@@ -147,8 +147,8 @@
       "runtime_label": "CPython + CinderX",
       "runtime_source": "provided",
       "runtime_version": "Python 3.14.0 (main, Oct  7 2025, 13:06:58) [GCC 11.4.0]",
-      "startup_mean_seconds": 0.015372666666666666,
-      "startup_stdev_seconds": 0.00023857144282862737
+      "startup_mean_seconds": 0.014004,
+      "startup_stdev_seconds": 0.00045197676931453014
     }
   ],
   "skipped_runtimes": [
