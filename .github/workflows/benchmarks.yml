@@ -51,8 +51,12 @@ jobs:
           fi
 
           has_module="$(.venv/bin/python - <<'PY'
-          import importlib.util
-          print("true" if importlib.util.find_spec("cinderx") else "false")
+          try:
+              import cinderx  # noqa: F401
+          except Exception:
+              print("false")
+          else:
+              print("true")
           PY
           )"
           echo "installed=$has_module" >> "$GITHUB_OUTPUT"

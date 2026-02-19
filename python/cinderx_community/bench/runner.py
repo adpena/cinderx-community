@@ -397,11 +397,18 @@ def _available_python_runtime_keys(targets: list[RuntimeTarget]) -> list[str]:
 def _runtime_has_cinderx_support(executable: str) -> bool:
     script = textwrap.dedent(
         """
-        import importlib.util
+        import platform
         import sys
 
-        has_module = importlib.util.find_spec("cinderx") is not None
+        has_module = False
+        try:
+            import cinderx  # noqa: F401
+            has_module = True
+        except Exception:
+            has_module = False
         branded = "cinder" in sys.version.lower()
+        if not branded:
+            branded = "cinder" in platform.python_implementation().lower()
         print("1" if (has_module or branded) else "0")
         """
     ).strip()
