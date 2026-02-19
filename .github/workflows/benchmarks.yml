@@ -51,11 +51,7 @@ jobs:
         run: |
           python_bin="${{ steps.cinderx_install.outputs.python_bin }}"
           if [[ -z "$python_bin" ]]; then
-            python_bin="$(.venv/bin/python - <<'PY'
-            import sys
-            print(sys.executable)
-            PY
-            )"
+            python_bin="$(.venv/bin/python -c 'import sys; print(sys.executable)')"
           fi
           cinderx_bin=""
           has_cinderx="false"
