@@ -394,7 +394,7 @@ def _available_python_runtime_keys(targets: list[RuntimeTarget]) -> list[str]:
 
 
 @lru_cache(maxsize=16)
-def _runtime_has_cinderx_support(executable: str) -> bool:
+def _runtime_cinderx_probe(executable: str) -> tuple[bool, str]:
     script = textwrap.dedent(
         """
         import json
@@ -420,12 +420,30 @@ def _runtime_has_cinderx_support(executable: str) -> bool:
         print(json.dumps(payload))
         """
     ).strip()
-    try:
-        completed = _run_command([executable, "-c", script], timeout_s=20)
-    except ValueError:
-        return False
 
-    for line in reversed(completed.stdout.splitlines()):
+    try:
+        completed = subprocess.run(
+            [executable, "-c", script],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except FileNotFoundError:
+        return False, f"probe executable not found: {executable}"
+    except subprocess.TimeoutExpired:
+        return False, "probe timed out after 20s"
+
+    stdout = completed.stdout.strip()
+    stderr = completed.stderr.strip()
+    if completed.returncode != 0:
+        stderr_text = stderr or "(no stderr)"
+        return (
+            False,
+            f"probe exited with code {completed.returncode}; stderr={stderr_text}",
+        )
+
+    for line in reversed(stdout.splitlines()):
         line = line.strip()
         if not line:
             continue
@@ -434,8 +452,27 @@ def _runtime_has_cinderx_support(executable: str) -> bool:
         except json.JSONDecodeError:
             continue
         if isinstance(payload, dict):
-            return bool(payload.get("result"))
-    return False
+            result = bool(payload.get("result"))
+            has_module = bool(payload.get("has_module"))
+            branded = bool(payload.get("branded"))
+            error = str(payload.get("error") or "")
+            return (
+                result,
+                f"result={result} has_module={has_module} branded={branded} error={error!r}",
+            )
+
+    truncated_stdout = "\n".join(stdout.splitlines()[-5:])
+    stderr_text = stderr or "(no stderr)"
+    return (
+        False,
+        "probe succeeded but emitted no parseable JSON payload; "
+        f"stdout_tail={truncated_stdout!r} stderr={stderr_text!r}",
+    )
+
+
+def _runtime_has_cinderx_support(executable: str) -> bool:
+    supported, _ = _runtime_cinderx_probe(executable)
+    return supported
 
 
 def _enforce_cinderx_baseline_policy(
@@ -446,13 +483,15 @@ def _enforce_cinderx_baseline_policy(
         cinderx_target is not None
         and cinderx_target.available
         and cinderx_target.executable is not None
-        and not _runtime_has_cinderx_support(str(cinderx_target.executable))
     ):
-        raise ValueError(
-            "The executable provided to --cpython-cinderx does not appear to expose CinderX "
-            "(`import cinderx` failed). Provide a real CinderX-enabled interpreter or omit "
-            "--cpython-cinderx."
-        )
+        executable = str(cinderx_target.executable)
+        if not _runtime_has_cinderx_support(executable):
+            _, probe_detail = _runtime_cinderx_probe(executable)
+            raise ValueError(
+                "The executable provided to --cpython-cinderx does not appear to expose CinderX "
+                "(`import cinderx` failed). Provide a real CinderX-enabled interpreter or omit "
+                f"--cpython-cinderx. Probe detail: {probe_detail}"
+            )
 
     if not require_cinderx_baseline:
         return
