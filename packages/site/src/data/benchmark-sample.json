@@ -1,0 +1,14 @@
+[
+  {
+    "benchmark": "richards",
+    "relative_speedup": 1.19
+  },
+  {
+    "benchmark": "deltablue",
+    "relative_speedup": 1.12
+  },
+  {
+    "benchmark": "nbody",
+    "relative_speedup": 1.08
+  }
+]

@@ -1,0 +1,32 @@
+---
+title: Compatibility matrix
+---
+
+# Compatibility matrix
+
+This matrix combines upstream constraints with this repo's operational policy.
+
+| Area                                      | Status                     | Evidence                                                       | Notes                                                          |
+| ----------------------------------------- | -------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
+| Stock CPython baseline                    | Confirmed                  | [CinderX README](https://github.com/facebookincubator/cinderx) | CPython 3.14+ is required.                                     |
+| Linux x86_64 support                      | Confirmed                  | [CinderX README](https://github.com/facebookincubator/cinderx) | Primary supported environment for external users.              |
+| macOS support                             | Confirmed with limitations | [CinderX README](https://github.com/facebookincubator/cinderx) | Build/import may work, but most features are disabled.         |
+| Windows support                           | Not supported              | [CinderX README](https://github.com/facebookincubator/cinderx) | Upstream says Windows is not yet supported.                    |
+| Toolchain floor                           | Confirmed                  | [CinderX README](https://github.com/facebookincubator/cinderx) | GCC 13+ or Clang 18+.                                          |
+| External-user maturity                    | Confirmed                  | [CinderX README](https://github.com/facebookincubator/cinderx) | Upstream labels external use as experimental.                  |
+| Release cadence                           | Confirmed                  | [CinderX README](https://github.com/facebookincubator/cinderx) | Weekly PyPI releases are stated upstream.                      |
+| Cinder (fork) vs CinderX (extension)      | Confirmed                  | [CinderX README](https://github.com/facebookincubator/cinderx) | CinderX is extension-based and targets stock CPython 3.14+.    |
+| Publishable benchmark policy in this repo | Confirmed (repo policy)    | `python/cinderx_community/bench/runner.py`                     | Comparisons are publishable only when truly CinderX-baselined. |
+
+## Runtime feature availability framing
+
+We separate:
+
+- confirmed upstream feature claims,
+- measured behavior in this repository's benchmark outputs,
+- unknowns that still require reproduction.
+
+Where behavior is unknown for external workloads, we mark it as TODO/hypothesis until backed by:
+
+- upstream code/tests, or
+- reproducible benchmark or compatibility results in this repository.

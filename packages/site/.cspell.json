@@ -1,0 +1,43 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "allowCompoundWords": true,
+  "ignorePaths": [
+    "node_modules/**",
+    "build/**",
+    "static/data/**",
+    "docs/generated/**",
+    "pnpm-lock.yaml"
+  ],
+  "words": [
+    "abi",
+    "abi3",
+    "adpena",
+    "asmjit",
+    "benchmarks",
+    "Cinder",
+    "cinderx",
+    "Codegen",
+    "Codon",
+    "CPython",
+    "docusaurus",
+    "faulthandler",
+    "manylinux",
+    "msgpack",
+    "nbody",
+    "numba",
+    "Nuitka",
+    "otool",
+    "pystate",
+    "pyjit",
+    "pytest",
+    "PYTHONJITDUMPASM",
+    "pyperformance",
+    "pypy",
+    "jitdump",
+    "interp",
+    "toolchain",
+    "uv",
+    "venv"
+  ]
+}

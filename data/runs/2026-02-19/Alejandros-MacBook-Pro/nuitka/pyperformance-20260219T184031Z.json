@@ -1,0 +1,8 @@
+{
+  "available": false,
+  "generated_at_utc": "2026-02-19T18:40:31.933974+00:00",
+  "reason": "not provided",
+  "runtime": "nuitka",
+  "source": "none",
+  "suite": "pyperformance"
+}

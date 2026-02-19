@@ -1,0 +1,164 @@
+.wrapper {
+  border: 1px solid rgba(28, 64, 76, 0.2);
+  border-radius: 14px;
+  padding: 1rem;
+  background: linear-gradient(180deg, #f7fcfd 0%, #fdfefe 100%);
+}
+
+.notice {
+  border: 1px dashed rgba(28, 64, 76, 0.25);
+  border-radius: 10px;
+  background: #f8fbfc;
+  color: #274955;
+  padding: 0.8rem;
+}
+
+.presets {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.presetButton {
+  border: 1px solid rgba(28, 64, 76, 0.3);
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  color: #1f3f4a;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.presetButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.presetActive {
+  background: #18434f;
+  color: #ecf8fa;
+  border-color: #18434f;
+}
+
+.controls {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.controls label {
+  display: grid;
+  gap: 0.35rem;
+  color: #274955;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.controls select {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid rgba(28, 64, 76, 0.3);
+  padding: 0.45rem 0.55rem;
+  background: #fff;
+  color: #18323b;
+}
+
+.meta {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.meta p {
+  margin: 0;
+  color: #1e3d48;
+  font-size: 0.86rem;
+}
+
+.chart {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.chartRow {
+  display: grid;
+  grid-template-columns: 180px 1fr 80px;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.chartLabel {
+  font-size: 0.84rem;
+  color: #31535f;
+}
+
+.chartTrack {
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(28, 64, 76, 0.1);
+  overflow: hidden;
+}
+
+.chartBar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2f8091, #4ba7a6);
+}
+
+.compareBar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2f6cb8, #5a8fd8);
+}
+
+.chartValue {
+  font-size: 0.82rem;
+  text-align: right;
+  color: #23454f;
+  font-weight: 600;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+
+.table th,
+.table td {
+  border: 1px solid rgba(28, 64, 76, 0.18);
+  padding: 0.45rem 0.5rem;
+  text-align: left;
+  font-size: 0.84rem;
+  color: #264752;
+}
+
+.deltaBetter {
+  color: #0f6b3f;
+  font-weight: 700;
+}
+
+.deltaWorse {
+  color: #8f2a1c;
+  font-weight: 700;
+}
+
+.warning {
+  margin-top: 0.75rem;
+  color: #8a3d00;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 700px) {
+  .chartRow {
+    grid-template-columns: 1fr;
+  }
+
+  .chartValue {
+    text-align: left;
+  }
+}

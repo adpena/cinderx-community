@@ -1,0 +1,62 @@
+---
+title: Architecture Overview
+---
+
+# Architecture Overview
+
+This page summarizes the major CinderX subsystems using line-level upstream references.
+
+Validated against:
+
+- CinderX `31bca9f3156b78cca3c6b36000c42c48f5ddf037`
+- CPython `157f271de352f16ecd052fb1fb0fcce528962407`
+
+<svg viewBox="0 0 900 280" width="100%" role="img" aria-label="CinderX architecture overview">
+  <rect x="20" y="30" width="170" height="70" rx="8" fill="#f2f5f7" stroke="#0f172a" />
+  <text x="105" y="70" textAnchor="middle" fontSize="16" fill="#0f172a">
+    Python Source
+  </text>
+  <rect x="230" y="30" width="170" height="70" rx="8" fill="#fdf6e3" stroke="#0f172a" />
+  <text x="315" y="70" textAnchor="middle" fontSize="16" fill="#0f172a">
+    Static Compiler
+  </text>
+  <rect x="440" y="30" width="170" height="70" rx="8" fill="#f3f4f6" stroke="#0f172a" />
+  <text x="525" y="70" textAnchor="middle" fontSize="16" fill="#0f172a">
+    CinderX Frame Eval
+  </text>
+  <rect x="650" y="30" width="170" height="70" rx="8" fill="#e8f5e9" stroke="#0f172a" />
+  <text x="735" y="70" textAnchor="middle" fontSize="16" fill="#0f172a">
+    JIT + Native Code
+  </text>
+  <rect x="230" y="160" width="380" height="80" rx="8" fill="#fff7ed" stroke="#0f172a" />
+  <text x="420" y="192" textAnchor="middle" fontSize="15" fill="#0f172a">
+    UpstreamBorrow + Version-Gated Shims
+  </text>
+  <text x="420" y="214" textAnchor="middle" fontSize="13" fill="#0f172a">
+    (`PY_VERSION_HEX`, copied CPython internals)
+  </text>
+  <path d="M190 65 L230 65" stroke="#0f172a" strokeWidth="2" />
+  <path d="M400 65 L440 65" stroke="#0f172a" strokeWidth="2" />
+  <path d="M610 65 L650 65" stroke="#0f172a" strokeWidth="2" />
+  <path d="M525 100 L525 160" stroke="#0f172a" strokeWidth="2" />
+</svg>
+
+## Confirmed By Code/Test
+
+- CinderX declares JIT and Static Python as core features in upstream README.
+  Source: [README.md#L16](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/README.md#L16)
+- CinderX architecture states that Static Python uses a custom compiler and a modified interpreter loop.
+  Source: [cinderx/AGENTS.md#L12](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/AGENTS.md#L12)
+- Multi-version support is explicit via `PY_VERSION_HEX` and `Py_GIL_DISABLED`.
+  Source: [cinderx/AGENTS.md#L23](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/AGENTS.md#L23)
+- The `UpstreamBorrow` system is documented as the mechanism for copying selected CPython internals with provenance.
+  Source: [cinderx/AGENTS.md#L31](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/AGENTS.md#L31)
+
+## Inferred / Hypothesis
+
+- Inference: the architecture intentionally separates stable public APIs from unstable CPython integration points to reduce fork pressure across Python versions.
+
+## Unknown Yet
+
+- Exact maintenance overhead per CPython release is not yet quantified.
+- Cross-platform parity (especially macOS feature gaps) is partially documented but not fully traced subsystem-by-subsystem.

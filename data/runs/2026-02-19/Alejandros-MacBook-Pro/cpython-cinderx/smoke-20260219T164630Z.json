@@ -1,0 +1,108 @@
+{
+  "benchmarks": [
+    {
+      "benchmark": "dynamic_dispatch",
+      "description": "Attribute lookup and dynamic dispatch loops.",
+      "loops": 8000,
+      "mean_seconds": 0.000738805664392809,
+      "samples": [
+        0.0007393750129267573,
+        0.0007386250072158873,
+        0.0007384169730357826
+      ],
+      "stdev_seconds": 5.03922483974211e-07,
+      "warmups": [
+        0.0007312080124393106
+      ],
+      "workload_class": "interpreter-heavy-dynamic-dispatch"
+    },
+    {
+      "benchmark": "compute_numeric",
+      "description": "Pure-Python numeric loop with arithmetic accumulation.",
+      "loops": 65000,
+      "mean_seconds": 0.004504264002510657,
+      "samples": [
+        0.004523999989032745,
+        0.004442958015715703,
+        0.004545834002783522
+      ],
+      "stdev_seconds": 5.420331218472299e-05,
+      "warmups": [
+        0.0043948749953415245
+      ],
+      "workload_class": "compute-bound-numeric"
+    },
+    {
+      "benchmark": "serialization_json",
+      "description": "JSON encode/decode roundtrip over nested payloads.",
+      "loops": 2000,
+      "mean_seconds": 0.009281333671727529,
+      "samples": [
+        0.009101417002966627,
+        0.009420917020179331,
+        0.009321666992036626
+      ],
+      "stdev_seconds": 0.00016352415049495505,
+      "warmups": [
+        0.009249833994545043
+      ],
+      "workload_class": "serialization-heavy"
+    },
+    {
+      "benchmark": "io_tempfile",
+      "description": "Filesystem write/read roundtrip through temporary files.",
+      "loops": 140,
+      "mean_seconds": 0.017136375332484022,
+      "samples": [
+        0.016838458977872506,
+        0.017543167021358386,
+        0.017027499998221174
+      ],
+      "stdev_seconds": 0.0003647516078738507,
+      "warmups": [
+        0.017839499982073903
+      ],
+      "workload_class": "io-bound"
+    },
+    {
+      "benchmark": "hashlib_sha256",
+      "description": "Hashing loop using stdlib native extension pathways.",
+      "loops": 6000,
+      "mean_seconds": 0.0028060693390822657,
+      "samples": [
+        0.0028033750131726265,
+        0.0027869170007761568,
+        0.0028279160032980144
+      ],
+      "stdev_seconds": 2.063187088044459e-05,
+      "warmups": [
+        0.002810957987094298
+      ],
+      "workload_class": "c-extension-dominated"
+    }
+  ],
+  "compile_command": null,
+  "compile_time_seconds": null,
+  "generated_at_utc": "2026-02-19T16:46:30.343293+00:00",
+  "run_id": "20260219T164630Z",
+  "runtime": "cpython-cinderx",
+  "runtime_details": {
+    "abiflags": "",
+    "build": "('main', 'Feb  3 2026 15:32:20')",
+    "compiler": "Clang 17.0.0 (clang-1700.6.3.2)",
+    "config_args": "'--prefix=/opt/homebrew/opt/python@3.14' '--enable-ipv6' '--datarootdir=/opt/homebrew/opt/python@3.14/share' '--datadir=/opt/homebrew/opt/python@3.14/share' '--without-ensurepip' '--enable-loadable-sqlite-extensions' '--with-openssl=/opt/homebrew/opt/openssl@3' '--enable-optimizations' '--with-system-expat' '--with-system-libmpdec' '--with-readline=editline' '--with-lto' '--enable-framework=/opt/homebrew/opt/python@3.14/Frameworks' '--with-dtrace' '--with-dbmliborder=ndbm' 'MACOSX_DEPLOYMENT_TARGET=26' 'CFLAGS_NODIST=-I/opt/homebrew/include' 'LDFLAGS_NODIST=-L/opt/homebrew/lib -Wl,-rpath,/opt/homebrew/lib' 'CPPFLAGS=-I/opt/homebrew/include' 'py_cv_module__tkinter=n/a' 'PKG_CONFIG_PATH=/opt/homebrew/opt/pkgconf/lib/pkgconfig:/opt/homebrew/opt/mpdecimal/lib/pkgconfig:/opt/homebrew/opt/openssl@3/lib/pkgconfig:/opt/homebrew/opt/readline/lib/pkgconfig:/opt/homebrew/opt/sqlite/lib/pkgconfig:/opt/homebrew/opt/xz/lib/pkgconfig:/opt/homebrew/opt/lz4/lib/pkgconfig:/opt/homebrew/opt/zstd/lib/pkgconfig' 'PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig:/opt/homebrew/Library/Homebrew/os/mac/pkgconfig/26' 'CC=clang'",
+    "implementation": "CPython",
+    "version": "3.14.3"
+  },
+  "runtime_label": "CPython + CinderX",
+  "runtime_source": "provided",
+  "runtime_version": "Python 3.14.3 (main, Feb  3 2026, 15:32:20) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "startup_mean_seconds": 0.020332,
+  "startup_samples_seconds": [
+    0.020396,
+    0.020189,
+    0.020411
+  ],
+  "startup_stdev_seconds": 0.00012406852945046195,
+  "suite": "smoke"
+}

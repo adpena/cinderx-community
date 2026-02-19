@@ -1,0 +1,72 @@
+---
+title: Runtime Hooks And CPython Extension Points
+---
+
+# Runtime Hooks And CPython Extension Points
+
+<svg
+  viewBox="0 0 980 250"
+  width="100%"
+  role="img"
+  aria-label="CPython extension points used by CinderX"
+>
+  <rect x="30" y="40" width="270" height="70" rx="8" fill="#f2f5f7" stroke="#0f172a" />
+  <text x="165" y="75" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Frame Eval Hook (PEP 523)
+  </text>
+  <text x="165" y="94" textAnchor="middle" fontSize="12" fill="#0f172a">
+    _PyInterpreterState_SetEvalFrameFunc
+  </text>
+  <rect x="350" y="40" width="270" height="70" rx="8" fill="#fdf6e3" stroke="#0f172a" />
+  <text x="485" y="75" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Code Extra API
+  </text>
+  <text x="485" y="94" textAnchor="middle" fontSize="12" fill="#0f172a">
+    PyUnstable_Eval_RequestCodeExtraIndex
+  </text>
+  <rect x="670" y="40" width="270" height="70" rx="8" fill="#e8f5e9" stroke="#0f172a" />
+  <text x="805" y="75" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Monitoring / Instrumentation
+  </text>
+  <text x="805" y="94" textAnchor="middle" fontSize="12" fill="#0f172a">
+    sys.monitoring + instrumentation.c
+  </text>
+  <rect x="350" y="155" width="270" height="60" rx="8" fill="#fff7ed" stroke="#0f172a" />
+  <text x="485" y="188" textAnchor="middle" fontSize="14" fill="#0f172a">
+    CinderX integrates all three
+  </text>
+  <path d="M300 75 L350 75" stroke="#0f172a" strokeWidth="2" />
+  <path d="M620 75 L670 75" stroke="#0f172a" strokeWidth="2" />
+  <path d="M485 110 L485 155" stroke="#0f172a" strokeWidth="2" />
+</svg>
+
+## Confirmed By Code/Test
+
+- CinderX installs its evaluator with `_PyInterpreterState_SetEvalFrameFunc(interp, Ci_EvalFrame)` when `ENABLE_PEP523_HOOK` is active.
+  Source: [cinderx/Interpreter/interpreter_base.cpp#L50](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Interpreter/interpreter_base.cpp#L50)
+- CPython defines the eval-frame hook function type and getter/setter declarations in `pystate.h`.
+  Source: [Include/cpython/pystate.h#L314](https://github.com/python/cpython/blob/157f271de352f16ecd052fb1fb0fcce528962407/Include/cpython/pystate.h#L314)
+- CPython implementation maps default evaluator to `NULL`, invalidates executors when needed, and updates the interpreter-wide pointer.
+  Source: [Python/pystate.c#L2995](https://github.com/python/cpython/blob/157f271de352f16ecd052fb1fb0fcce528962407/Python/pystate.c#L2995)
+- CPython docs tie these APIs to PEP 523.
+  Source: [Doc/c-api/init.rst#L1454](https://github.com/python/cpython/blob/157f271de352f16ecd052fb1fb0fcce528962407/Doc/c-api/init.rst#L1454)
+- Historical framing for this hook as debugger/JIT extension point appears in Python 3.6 whatsnew.
+  Source: [Doc/whatsnew/3.6.rst#L607](https://github.com/python/cpython/blob/157f271de352f16ecd052fb1fb0fcce528962407/Doc/whatsnew/3.6.rst#L607)
+- CinderX uses unstable code-extra APIs for per-code metadata lifecycle (`RequestCodeExtraIndex`, `Code_GetExtra`, `Code_SetExtra`).
+  Source: [cinderx/Common/code.cpp#L199](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Common/code.cpp#L199)
+- CPython documents code-extra as low-level support for JIT-style frame-eval extensions.
+  Source: [Doc/c-api/code.rst#L294](https://github.com/python/cpython/blob/157f271de352f16ecd052fb1fb0fcce528962407/Doc/c-api/code.rst#L294)
+- CinderX JIT initialization patches monitoring/profile/trace integration points.
+  Source: [cinderx/Jit/pyjit.cpp#L3508](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Jit/pyjit.cpp#L3508)
+- CPython `sys.monitoring` is a first-class execution event API (introduced in 3.12) with tool IDs and event sets.
+  Source: [Doc/library/sys.monitoring.rst#L1](https://github.com/python/cpython/blob/157f271de352f16ecd052fb1fb0fcce528962407/Doc/library/sys.monitoring.rst#L1)
+- CPython instrumentation mutates monitoring versions and can invalidate tier-2 executors when events change.
+  Source: [Python/instrumentation.c#L2002](https://github.com/python/cpython/blob/157f271de352f16ecd052fb1fb0fcce528962407/Python/instrumentation.c#L2002)
+
+## Inferred / Hypothesis
+
+- Inference: CinderX runtime correctness depends on coordinated behavior between eval-frame replacement, code-extra metadata, and monitoring instrumentation invalidation.
+
+## Unknown Yet
+
+- Interaction boundaries between CinderX JIT and future CPython tiering changes are still an ongoing compatibility surface.

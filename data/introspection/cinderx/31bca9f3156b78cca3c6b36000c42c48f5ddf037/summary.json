@@ -1,0 +1,20 @@
+{
+  "commit_sha": "31bca9f3156b78cca3c6b36000c42c48f5ddf037",
+  "counts": {
+    "c_cpp_files_scanned": 405,
+    "flags_discovered": 53,
+    "python_files_scanned": 777,
+    "test_files_classified": 745
+  },
+  "generated_at_utc": "2026-02-19T18:40:28.075072+00:00",
+  "limitations": [
+    "Python and C/C++ inventories are static analysis outputs.",
+    "C/C++ symbol extraction uses regex fallback rather than full Clang AST parsing.",
+    "Test runtime requirements are inferred from textual patterns."
+  ],
+  "output_dir": "/Users/adpena/PycharmProjects/cinderx-community/data/introspection/cinderx/31bca9f3156b78cca3c6b36000c42c48f5ddf037",
+  "provenance_banner": "Built from cinderx @ 31bca9f3156b78cca3c6b36000c42c48f5ddf037",
+  "repo": "cinderx",
+  "repo_path": "/Users/adpena/PycharmProjects/cinderx-community/.cache/upstream/cinderx",
+  "repo_url": "https://github.com/facebookincubator/cinderx.git"
+}

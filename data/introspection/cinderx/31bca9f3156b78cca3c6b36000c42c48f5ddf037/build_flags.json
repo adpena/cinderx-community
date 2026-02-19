@@ -1,0 +1,382 @@
+{
+  "commit_sha": "31bca9f3156b78cca3c6b36000c42c48f5ddf037",
+  "flags": [
+    {
+      "kind": "cmake-set-bool",
+      "line": 168,
+      "name": "ASMJIT_STATIC",
+      "path": "CMakeLists.txt",
+      "snippet": "set(ASMJIT_STATIC TRUE)"
+    },
+    {
+      "kind": "ifdef",
+      "line": 235,
+      "name": "CINDERX_INTERPRETER",
+      "path": "cinderx/Interpreter/3.12/Includes/ceval.c",
+      "snippet": "#ifndef CINDERX_INTERPRETER"
+    },
+    {
+      "kind": "if-defined",
+      "line": 33,
+      "name": "CINDER_AARCH64",
+      "path": "cinderx/Jit/code_patcher.cpp",
+      "snippet": "#elif defined(CINDER_AARCH64)"
+    },
+    {
+      "kind": "ifdef",
+      "line": 8,
+      "name": "CINDER_UNKNOWN",
+      "path": "cinderx/Jit/codegen/arch/unknown.cpp",
+      "snippet": "#ifdef CINDER_UNKNOWN"
+    },
+    {
+      "kind": "ifdef",
+      "line": 13,
+      "name": "CINDER_X86_64",
+      "path": "cinderx/Jit/code_patcher.cpp",
+      "snippet": "#ifdef CINDER_X86_64"
+    },
+    {
+      "kind": "ifdef",
+      "line": 209,
+      "name": "CI_CO_SUPPRESS_JIT",
+      "path": "cinderx/Common/py-portability.h",
+      "snippet": "#ifndef CI_CO_SUPPRESS_JIT"
+    },
+    {
+      "kind": "ifdef",
+      "line": 2,
+      "name": "Ci_CHECKED_DICT_H",
+      "path": "cinderx/StaticPython/checked_dict.h",
+      "snippet": "#ifndef Ci_CHECKED_DICT_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 2,
+      "name": "Ci_CHECKED_LIST_H",
+      "path": "cinderx/StaticPython/checked_list.h",
+      "snippet": "#ifndef Ci_CHECKED_LIST_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 2,
+      "name": "Ci_CLASSLOADER_H",
+      "path": "cinderx/StaticPython/classloader.h",
+      "snippet": "#ifndef Ci_CLASSLOADER_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 5,
+      "name": "Ci_INTERNAL_OPCODE_H",
+      "path": "cinderx/Interpreter/3.12/cinder_opcode.h",
+      "snippet": "#ifndef Ci_INTERNAL_OPCODE_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 4,
+      "name": "Ci_MODULEOBJECT_H",
+      "path": "cinderx/StaticPython/strictmoduleobject.h",
+      "snippet": "#ifndef Ci_MODULEOBJECT_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 3,
+      "name": "Ci_STATIC_ARRAY_H",
+      "path": "cinderx/StaticPython/static_array.h",
+      "snippet": "#ifndef Ci_STATIC_ARRAY_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 33,
+      "name": "Ci_TPFLAGS_HAVE_AM_EXTRA",
+      "path": "cinderx/async_lazy_value.cpp",
+      "snippet": "#ifdef Ci_TPFLAGS_HAVE_AM_EXTRA"
+    },
+    {
+      "kind": "ifdef",
+      "line": 3,
+      "name": "Ci_VTABLE_H",
+      "path": "cinderx/StaticPython/vtable.h",
+      "snippet": "#ifndef Ci_VTABLE_H"
+    },
+    {
+      "kind": "if-defined",
+      "line": 412,
+      "name": "ENABLE_ADAPTIVE_STATIC_PYTHON",
+      "path": "cinderx/Interpreter/3.12/cinder-bytecodes.c",
+      "snippet": "#if ENABLE_SPECIALIZATION && defined(ENABLE_ADAPTIVE_STATIC_PYTHON)"
+    },
+    {
+      "kind": "ifdef",
+      "line": 13,
+      "name": "ENABLE_DISASSEMBLER",
+      "path": "cinderx/Jit/disassembler.cpp",
+      "snippet": "#ifndef ENABLE_DISASSEMBLER"
+    },
+    {
+      "kind": "ifdef",
+      "line": 5,
+      "name": "ENABLE_ELF_READER",
+      "path": "cinderx/Jit/elf/reader.cpp",
+      "snippet": "#ifdef ENABLE_ELF_READER"
+    },
+    {
+      "kind": "if-defined",
+      "line": 49,
+      "name": "ENABLE_EVAL_HOOK",
+      "path": "cinderx/_cinderx-lib.cpp",
+      "snippet": "#if PY_VERSION_HEX < 0x030D0000 && defined(ENABLE_EVAL_HOOK)"
+    },
+    {
+      "kind": "ifdef",
+      "line": 822,
+      "name": "ENABLE_FUNC_EVENT_MODIFY_QUALNAME",
+      "path": "cinderx/_cinderx-lib.cpp",
+      "snippet": "#ifdef ENABLE_FUNC_EVENT_MODIFY_QUALNAME"
+    },
+    {
+      "kind": "ifdef",
+      "line": 28,
+      "name": "ENABLE_GENERATOR_AWAITER",
+      "path": "cinderx/async_lazy_value.cpp",
+      "snippet": "#ifdef ENABLE_GENERATOR_AWAITER"
+    },
+    {
+      "kind": "ifdef",
+      "line": 351,
+      "name": "ENABLE_INTERPRETER_LOOP",
+      "path": "cinderx/_cinderx-lib.cpp",
+      "snippet": "#ifdef ENABLE_INTERPRETER_LOOP"
+    },
+    {
+      "kind": "if-defined",
+      "line": 31,
+      "name": "ENABLE_LAZY_IMPORTS",
+      "path": "cinderx/Interpreter/3.14/interpreter.c",
+      "snippet": "#if !defined(ENABLE_LAZY_IMPORTS) && !defined(DK_KIND)"
+    },
+    {
+      "kind": "if-defined",
+      "line": 1277,
+      "name": "ENABLE_LIGHTWEIGHT_FRAMES",
+      "path": "cinderx/_cinderx-lib.cpp",
+      "snippet": "#if defined(ENABLE_LIGHTWEIGHT_FRAMES) && PY_VERSION_HEX < 0x030E0000"
+    },
+    {
+      "kind": "cmake-option",
+      "line": 66,
+      "name": "ENABLE_LTO",
+      "path": "CMakeLists.txt",
+      "snippet": "option(ENABLE_LTO \"Enable Link-Time Optimization (full)\" OFF)"
+    },
+    {
+      "kind": "ifdef",
+      "line": 36,
+      "name": "ENABLE_PARALLEL_GC",
+      "path": "cinderx/_cinderx-lib.cpp",
+      "snippet": "#ifdef ENABLE_PARALLEL_GC"
+    },
+    {
+      "kind": "if-defined",
+      "line": 956,
+      "name": "ENABLE_PEP523_HOOK",
+      "path": "cinderx/_cinderx-lib.cpp",
+      "snippet": "#elif defined(ENABLE_PEP523_HOOK)"
+    },
+    {
+      "kind": "cmake-option",
+      "line": 20,
+      "name": "ENABLE_PGO_GENERATE",
+      "path": "CMakeLists.txt",
+      "snippet": "option(ENABLE_PGO_GENERATE \"Build with PGO profile generation\" OFF)"
+    },
+    {
+      "kind": "cmake-option",
+      "line": 21,
+      "name": "ENABLE_PGO_USE",
+      "path": "CMakeLists.txt",
+      "snippet": "option(ENABLE_PGO_USE \"Build with PGO profile use\" OFF)"
+    },
+    {
+      "kind": "ifdef",
+      "line": 25,
+      "name": "ENABLE_SHADOW_FRAMES",
+      "path": "cinderx/Jit/frame_header.cpp",
+      "snippet": "#ifdef ENABLE_SHADOW_FRAMES"
+    },
+    {
+      "kind": "ifdef",
+      "line": 354,
+      "name": "ENABLE_SPECIALIZATION",
+      "path": "cinderx/Interpreter/3.15/Includes/Python/ceval_macros.h",
+      "snippet": "#ifdef ENABLE_SPECIALIZATION"
+    },
+    {
+      "kind": "ifdef",
+      "line": 293,
+      "name": "ENABLE_SPECIALIZATION_FT",
+      "path": "cinderx/Interpreter/3.14/Includes/ceval_macros.h",
+      "snippet": "#ifdef ENABLE_SPECIALIZATION_FT"
+    },
+    {
+      "kind": "ifdef",
+      "line": 12,
+      "name": "ENABLE_SYMBOLIZER",
+      "path": "cinderx/Jit/symbolizer.cpp",
+      "snippet": "#ifdef ENABLE_SYMBOLIZER"
+    },
+    {
+      "kind": "ifdef",
+      "line": 16,
+      "name": "ENABLE_USDT",
+      "path": "cinderx/Jit/deopt.cpp",
+      "snippet": "#ifdef ENABLE_USDT"
+    },
+    {
+      "kind": "ifdef",
+      "line": 40,
+      "name": "ENABLE_XXCLASSLOADER",
+      "path": "cinderx/_cinderx-lib.cpp",
+      "snippet": "#ifdef ENABLE_XXCLASSLOADER"
+    },
+    {
+      "kind": "ifdef",
+      "line": 26,
+      "name": "JIT_FORCE_STL_CONTAINERS",
+      "path": "cinderx/Jit/containers.h",
+      "snippet": "#ifdef JIT_FORCE_STL_CONTAINERS"
+    },
+    {
+      "kind": "ifdef",
+      "line": 9,
+      "name": "Py_BUILD_CORE",
+      "path": "cinderx/Interpreter/3.12/cinder_opcode_metadata.h",
+      "snippet": "#ifndef Py_BUILD_CORE"
+    },
+    {
+      "kind": "compile-definition",
+      "line": 37,
+      "name": "Py_BUILD_CORE_MODULE",
+      "path": "CMakeLists.txt",
+      "snippet": "set(SHARED_FLAGS \"-DPy_BUILD_CORE -DPy_BUILD_CORE_MODULE -fPIC -Wall -Wextra -Wno-c99-designator -Wno-c++11-narrowing -Wno-cast-function-type-mismatch -Wno-deprecated-declarations -Wno-missing-field-initializers -Wno-null-pointer-subtraction -Wno-sign-compare -Wno-unknown-pragmas -Wno-unused-function -Wno-unused-parameter\")"
+    },
+    {
+      "kind": "ifdef",
+      "line": 3,
+      "name": "Py_CACHED_PROPERTIES_H",
+      "path": "cinderx/CachedProperties/cached_properties.h",
+      "snippet": "#ifndef Py_CACHED_PROPERTIES_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 94,
+      "name": "Py_DEBUG",
+      "path": "cinderx/Common/log.h",
+      "snippet": "#ifdef Py_DEBUG"
+    },
+    {
+      "kind": "ifdef",
+      "line": 2,
+      "name": "Py_DESCROBJECT_VECTORCALL_H",
+      "path": "cinderx/StaticPython/descrobject_vectorcall.h",
+      "snippet": "#ifndef Py_DESCROBJECT_VECTORCALL_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 23,
+      "name": "Py_GIL_DISABLED",
+      "path": "cinderx/Common/code_extra.h",
+      "snippet": "#ifdef Py_GIL_DISABLED"
+    },
+    {
+      "kind": "if-defined",
+      "line": 61,
+      "name": "Py_IMMORTAL_INSTANCES",
+      "path": "cinderx/Common/util.h",
+      "snippet": "#if defined(Py_IMMORTAL_INSTANCES) || PY_VERSION_HEX >= 0x030C0000"
+    },
+    {
+      "kind": "ifdef",
+      "line": 21,
+      "name": "Py_INTERNAL_OPCODE_H",
+      "path": "cinderx/Interpreter/3.12/cinder_opcode.h",
+      "snippet": "#ifdef Py_INTERNAL_OPCODE_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 5,
+      "name": "Py_LIMITED_API",
+      "path": "cinderx/Jit/pyjit_result.h",
+      "snippet": "#ifndef Py_LIMITED_API"
+    },
+    {
+      "kind": "ifdef",
+      "line": 3,
+      "name": "Py_METHODOBJECT_VECTORCALL_H",
+      "path": "cinderx/StaticPython/methodobject_vectorcall.h",
+      "snippet": "#ifndef Py_METHODOBJECT_VECTORCALL_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 4,
+      "name": "Py_OPCODE_H",
+      "path": "cinderx/Interpreter/3.10/cinder_opcode_ids.h",
+      "snippet": "#ifndef Py_OPCODE_H"
+    },
+    {
+      "kind": "ifdef",
+      "line": 6,
+      "name": "Py_OPCODE_IDS_H",
+      "path": "cinderx/Interpreter/3.14/opcode.h",
+      "snippet": "#ifndef Py_OPCODE_IDS_H"
+    },
+    {
+      "kind": "if-defined",
+      "line": 13,
+      "name": "Py_REF_DEBUG",
+      "path": "cinderx/Common/ref.cpp",
+      "snippet": "#if defined(Py_REF_DEBUG) && defined(Py_GIL_DISABLED)"
+    },
+    {
+      "kind": "ifdef",
+      "line": 457,
+      "name": "Py_STACKREF_DEBUG",
+      "path": "cinderx/Interpreter/3.14/interpreter.c",
+      "snippet": "#ifdef Py_STACKREF_DEBUG"
+    },
+    {
+      "kind": "ifdef",
+      "line": 431,
+      "name": "Py_STATS",
+      "path": "cinderx/Interpreter/3.12/interpreter.c",
+      "snippet": "#ifdef Py_STATS"
+    },
+    {
+      "kind": "ifdef",
+      "line": 430,
+      "name": "Py_TRACE_REFS",
+      "path": "cinderx/Jit/hir/printer.cpp",
+      "snippet": "#ifdef Py_TRACE_REFS"
+    },
+    {
+      "kind": "ifdef",
+      "line": 545,
+      "name": "_Py_JIT",
+      "path": "cinderx/Interpreter/3.14/interpreter.c",
+      "snippet": "#ifdef _Py_JIT"
+    },
+    {
+      "kind": "ifdef",
+      "line": 3,
+      "name": "incl_JIT_HIR_TYPE_INL_H",
+      "path": "cinderx/Jit/hir/type_inl.h",
+      "snippet": "#ifndef incl_JIT_HIR_TYPE_INL_H"
+    }
+  ],
+  "generated_at_utc": "2026-02-19T18:40:28.075072+00:00",
+  "limitations": [
+    "Build options are discovered heuristically from source text.",
+    "Not every conditional compilation branch is guaranteed to be surfaced."
+  ],
+  "repo": "cinderx"
+}

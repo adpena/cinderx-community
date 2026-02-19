@@ -1,0 +1,62 @@
+---
+title: Debugging And Observability
+---
+
+# Debugging And Observability
+
+<svg
+  viewBox="0 0 960 230"
+  width="100%"
+  role="img"
+  aria-label="CinderX debugging and observability flow"
+>
+  <rect x="30" y="35" width="250" height="70" rx="8" fill="#f2f5f7" stroke="#0f172a" />
+  <text x="155" y="70" textAnchor="middle" fontSize="14" fill="#0f172a">
+    JIT Runtime Logs
+  </text>
+  <text x="155" y="89" textAnchor="middle" fontSize="12" fill="#0f172a">
+    `PYTHONJITDUMPASM`, stats output
+  </text>
+  <rect x="355" y="35" width="250" height="70" rx="8" fill="#fdf6e3" stroke="#0f172a" />
+  <text x="480" y="70" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Post-processing Scripts
+  </text>
+  <text x="480" y="89" textAnchor="middle" fontSize="12" fill="#0f172a">
+    jit_log_stats_parser.py
+  </text>
+  <rect x="680" y="35" width="250" height="70" rx="8" fill="#e8f5e9" stroke="#0f172a" />
+  <text x="805" y="70" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Profiler Integration
+  </text>
+  <text x="805" y="89" textAnchor="middle" fontSize="12" fill="#0f172a">
+    perf map / trampoline logic
+  </text>
+  <rect x="355" y="140" width="250" height="60" rx="8" fill="#fff7ed" stroke="#0f172a" />
+  <text x="480" y="173" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Actionable triage workflow
+  </text>
+  <path d="M280 70 L355 70" stroke="#0f172a" strokeWidth="2" />
+  <path d="M605 70 L680 70" stroke="#0f172a" strokeWidth="2" />
+  <path d="M480 105 L480 140" stroke="#0f172a" strokeWidth="2" />
+</svg>
+
+## Confirmed By Code/Test
+
+- Upstream contributor guidance recommends `cinderx.jit.force_compile` to isolate failures and `PYTHONJITDUMPASM=1` for assembly+HIR dumps.
+  Source: [cinderx/AGENTS.md#L95](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/AGENTS.md#L95)
+- `jit_log_stats_parser.py` is a dedicated log parser for `-X jit-dump-hir-stats`.
+  Source: [cinderx/TestScripts/jit_log_stats_parser.py#L1](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/TestScripts/jit_log_stats_parser.py#L1)
+- The parser explicitly matches compile start/finish and per-function JSON stats lines.
+  Source: [cinderx/TestScripts/jit_log_stats_parser.py#L74](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/TestScripts/jit_log_stats_parser.py#L74)
+- The same script exposes `analyze`, `compare`, and diff-fail workflows via CLI subcommands.
+  Source: [cinderx/TestScripts/jit_log_stats_parser.py#L634](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/TestScripts/jit_log_stats_parser.py#L634)
+- Perf integration logic copies JIT entries to perf maps and checks evaluator/trampoline state.
+  Source: [cinderx/Jit/perf_jitdump.cpp#L346](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Jit/perf_jitdump.cpp#L346)
+
+## Inferred / Hypothesis
+
+- Inference: practical observability is designed as layered signals (runtime env flags, structured logs, and perf symbol materialization) rather than a single canonical debug API.
+
+## Unknown Yet
+
+- Recommended minimum logging profile for low-overhead production diagnosis is not yet documented as a source-backed preset.

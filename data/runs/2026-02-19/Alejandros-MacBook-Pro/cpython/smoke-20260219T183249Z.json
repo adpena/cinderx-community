@@ -1,0 +1,108 @@
+{
+  "benchmarks": [
+    {
+      "benchmark": "dynamic_dispatch",
+      "description": "Attribute lookup and dynamic dispatch loops.",
+      "loops": 8000,
+      "mean_seconds": 0.001923680674129476,
+      "samples": [
+        0.0018681670189835131,
+        0.002032833988778293,
+        0.0018700410146266222
+      ],
+      "stdev_seconds": 9.45341871443095e-05,
+      "warmups": [
+        0.001752917014528066
+      ],
+      "workload_class": "interpreter-heavy-dynamic-dispatch"
+    },
+    {
+      "benchmark": "compute_numeric",
+      "description": "Pure-Python numeric loop with arithmetic accumulation.",
+      "loops": 65000,
+      "mean_seconds": 0.013287944331144294,
+      "samples": [
+        0.013523165980586782,
+        0.013494959013769403,
+        0.012845707999076694
+      ],
+      "stdev_seconds": 0.00038324748961305916,
+      "warmups": [
+        0.015519834007136524
+      ],
+      "workload_class": "compute-bound-numeric"
+    },
+    {
+      "benchmark": "serialization_json",
+      "description": "JSON encode/decode roundtrip over nested payloads.",
+      "loops": 2000,
+      "mean_seconds": 0.03103218033599357,
+      "samples": [
+        0.03300775002571754,
+        0.030961207987274975,
+        0.029127582994988188
+      ],
+      "stdev_seconds": 0.0019410568905371469,
+      "warmups": [
+        0.040000333974603564
+      ],
+      "workload_class": "serialization-heavy"
+    },
+    {
+      "benchmark": "io_tempfile",
+      "description": "Filesystem write/read roundtrip through temporary files.",
+      "loops": 140,
+      "mean_seconds": 0.12460723599845853,
+      "samples": [
+        0.14868733298499137,
+        0.12699137500021607,
+        0.09814300001016818
+      ],
+      "stdev_seconds": 0.025356369772745975,
+      "warmups": [
+        0.13983733300119638
+      ],
+      "workload_class": "io-bound"
+    },
+    {
+      "benchmark": "hashlib_sha256",
+      "description": "Hashing loop using stdlib native extension pathways.",
+      "loops": 6000,
+      "mean_seconds": 0.008641083327044422,
+      "samples": [
+        0.0089121249911841,
+        0.008402209001360461,
+        0.008608915988588706
+      ],
+      "stdev_seconds": 0.00025647540314219014,
+      "warmups": [
+        0.011091375024989247
+      ],
+      "workload_class": "c-extension-dominated"
+    }
+  ],
+  "compile_command": null,
+  "compile_time_seconds": null,
+  "generated_at_utc": "2026-02-19T18:32:49.419510+00:00",
+  "run_id": "20260219T183249Z",
+  "runtime": "cpython",
+  "runtime_details": {
+    "abiflags": "",
+    "build": "('main', 'Feb 12 2026 00:29:58')",
+    "compiler": "Clang 21.1.4 ",
+    "config_args": "'--build=aarch64-apple-darwin' '--host=aarch64-apple-darwin' '--prefix=/install' '--with-openssl=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps' '--with-system-expat' '--with-system-libmpdec' '--without-ensurepip' '--with-tail-call-interp' '--enable-shared' '--with-mimalloc' '--enable-optimizations' '--enable-experimental-jit=yes-off' '--with-lto' '--with-build-python=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/host/bin/python3.14' 'ac_cv_lib_intl_textdomain=no' 'ac_cv_func_ptsname_r=no' 'ac_cv_func_explicit_bzero=no' '--with-dbmliborder=ndbm' 'build_alias=aarch64-apple-darwin' 'host_alias=aarch64-apple-darwin' 'PKG_CONFIG=pkg-config --static' 'PKG_CONFIG_PATH=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps/share/pkgconfig:/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps/lib/pkgconfig' 'CC=clang' 'CFLAGS=-O3 -arch arm64 -mmacosx-version-min=11.0 -Wno-nullability-completeness -Wno-expansion-to-defined -Wno-undef-prefix -fPIC -Werror=unguarded-availability-new' 'LDFLAGS=-arch arm64 -mmacosx-version-min=11.0 -LModules/_hacl -Wl,-headerpad,40' 'CPPFLAGS=-O3 -arch arm64 -mmacosx-version-min=11.0 -Wno-nullability-completeness -Wno-expansion-to-defined -Wno-undef-prefix -fPIC -Werror=unguarded-availability-new' 'PROFILE_TASK=-m test --pgo --ignore test_json'",
+    "implementation": "CPython",
+    "version": "3.14.3"
+  },
+  "runtime_label": "CPython baseline",
+  "runtime_source": "required",
+  "runtime_version": "Python 3.14.3 (main, Feb 12 2026, 00:29:58) [Clang 21.1.4 ]",
+  "startup_mean_seconds": 0.05398766666666666,
+  "startup_samples_seconds": [
+    0.055553,
+    0.052524,
+    0.053886
+  ],
+  "startup_stdev_seconds": 0.0015170571292253065,
+  "suite": "smoke"
+}

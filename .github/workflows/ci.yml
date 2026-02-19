@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  site:
+    name: Site Lint + Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: packages/site/pnpm-lock.yaml
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.0
+
+      - name: Install site dependencies
+        run: pnpm -C packages/site install --frozen-lockfile
+
+      - name: Lint site
+        run: pnpm -C packages/site lint
+
+      - name: Build site
+        run: pnpm -C packages/site build
+
+  python:
+    name: Python Lint + Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+
+      - name: Install package
+        run: |
+          uv python install 3.14
+          uv venv --python 3.14 .venv
+          uv pip install --python .venv/bin/python -e ./python[dev]
+
+      - name: Ruff lint
+        run: .venv/bin/python -m ruff check python
+
+      - name: Ruff format check
+        run: .venv/bin/python -m ruff format --check python
+
+      - name: Run tests
+        run: .venv/bin/python -m pytest python/cinderx_community/tests

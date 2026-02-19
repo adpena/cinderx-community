@@ -1,0 +1,111 @@
+{
+  "benchmarks": [
+    {
+      "benchmark": "dynamic_dispatch",
+      "description": "Attribute lookup and dynamic dispatch loops.",
+      "loops": 8000,
+      "mean_seconds": 0.0006761246671279272,
+      "samples": [
+        0.0006889160140417516,
+        0.0006711670139338821,
+        0.0006682909734081477
+      ],
+      "stdev_seconds": 1.117057828309582e-05,
+      "warmups": [
+        0.000634457974229008
+      ],
+      "workload_class": "interpreter-heavy-dynamic-dispatch"
+    },
+    {
+      "benchmark": "compute_numeric",
+      "description": "Pure-Python numeric loop with arithmetic accumulation.",
+      "loops": 65000,
+      "mean_seconds": 0.0032939439988695085,
+      "samples": [
+        0.003249291010433808,
+        0.0032856659963726997,
+        0.003346874989802018
+      ],
+      "stdev_seconds": 4.93158417887871e-05,
+      "warmups": [
+        0.004123499995330349
+      ],
+      "workload_class": "compute-bound-numeric"
+    },
+    {
+      "benchmark": "serialization_json",
+      "description": "JSON encode/decode roundtrip over nested payloads.",
+      "loops": 2000,
+      "mean_seconds": 0.06980970833683386,
+      "samples": [
+        0.06931254200753756,
+        0.07059162500081584,
+        0.0695249580021482
+      ],
+      "stdev_seconds": 0.0006854381013272688,
+      "warmups": [
+        0.06334112500189804
+      ],
+      "workload_class": "serialization-heavy"
+    },
+    {
+      "benchmark": "io_tempfile",
+      "description": "Filesystem write/read roundtrip through temporary files.",
+      "loops": 140,
+      "mean_seconds": 0.019397833336067077,
+      "samples": [
+        0.0175517919997219,
+        0.01985891698859632,
+        0.020782791019883007
+      ],
+      "stdev_seconds": 0.001664117564369414,
+      "warmups": [
+        0.02207300000009127
+      ],
+      "workload_class": "io-bound"
+    },
+    {
+      "benchmark": "hashlib_sha256",
+      "description": "Hashing loop using stdlib native extension pathways.",
+      "loops": 6000,
+      "mean_seconds": 0.003332027670694515,
+      "samples": [
+        0.003285707993200049,
+        0.0032157080131582916,
+        0.003494667005725205
+      ],
+      "stdev_seconds": 0.00014513326385043622,
+      "warmups": [
+        0.003570667002350092
+      ],
+      "workload_class": "c-extension-dominated"
+    }
+  ],
+  "compile_command": [
+    "/Users/adpena/PycharmProjects/cinderx-community/.venv/bin/nuitka",
+    "--onefile",
+    "--output-dir=/Users/adpena/PycharmProjects/cinderx-community/data/runs/2026-02-19/Alejandros-MacBook-Pro/nuitka/build",
+    "--output-filename=smoke-worker",
+    "/Users/adpena/PycharmProjects/cinderx-community/data/runs/2026-02-19/Alejandros-MacBook-Pro/nuitka/build/smoke_worker_nuitka.py"
+  ],
+  "compile_time_seconds": 44.369024,
+  "generated_at_utc": "2026-02-19T16:46:30.343293+00:00",
+  "run_id": "20260219T164630Z",
+  "runtime": "nuitka",
+  "runtime_details": {
+    "compiled_worker": "/Users/adpena/PycharmProjects/cinderx-community/data/runs/2026-02-19/Alejandros-MacBook-Pro/nuitka/build/smoke-worker",
+    "implementation": "Nuitka",
+    "tool_command": "/Users/adpena/PycharmProjects/cinderx-community/.venv/bin/nuitka"
+  },
+  "runtime_label": "Nuitka",
+  "runtime_source": "provided",
+  "runtime_version": "4.0.1",
+  "startup_mean_seconds": 0.39786499999999997,
+  "startup_samples_seconds": [
+    0.534775,
+    0.484286,
+    0.174534
+  ],
+  "startup_stdev_seconds": 0.1950508560632329,
+  "suite": "smoke"
+}

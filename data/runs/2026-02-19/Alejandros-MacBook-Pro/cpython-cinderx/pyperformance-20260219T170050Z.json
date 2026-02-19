@@ -1,0 +1,86 @@
+{
+  "benchmarks": [
+    {
+      "benchmark": "nbody",
+      "compile_time_seconds": null,
+      "description": "pyperformance benchmark: nbody (n-body benchmark)",
+      "mean_seconds": 0.12342871875007404,
+      "memory_rss_bytes": 27787264,
+      "samples": [
+        0.12362666698754765,
+        0.11846437500207685,
+        0.11837437501526438,
+        0.11977291700895876,
+        0.14472795798792504,
+        0.13728766699205153,
+        0.13120037500630133,
+        0.13479162499425001,
+        0.11898129200562835,
+        0.12261216700426303,
+        0.1206109169870615,
+        0.12362600001506507,
+        0.11779887499869801,
+        0.11842604100820608,
+        0.11982641601935029,
+        0.12361799998325296,
+        0.11791854200419039,
+        0.11626133299432695,
+        0.11869512498378754,
+        0.1219537080032751
+      ],
+      "stdev_seconds": 0.007620309241354823,
+      "warmups": [
+        0.11916075000772253,
+        0.11838216599426232,
+        0.12100741700851358,
+        0.11960500001441687,
+        0.11869683300028555,
+        0.1513192499987781,
+        0.14156116702361032,
+        0.12269500002730638,
+        0.11719666700810194,
+        0.11571645800722763,
+        0.1169387080008164,
+        0.1185807500150986,
+        0.11730787498527206
+      ],
+      "workload_class": "compute-bound-numeric"
+    }
+  ],
+  "generated_at_utc": "2026-02-19T17:00:50.859713+00:00",
+  "pyperformance_command": [
+    "/Users/adpena/PycharmProjects/cinderx-community/.venv/bin/python",
+    "-m",
+    "pyperformance",
+    "run",
+    "--python",
+    "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+    "--output",
+    "/Users/adpena/PycharmProjects/cinderx-community/data/runs/2026-02-19/Alejandros-MacBook-Pro/cpython-cinderx/pyperformance-raw-20260219T170050Z.json",
+    "--fast",
+    "--benchmarks",
+    "nbody"
+  ],
+  "pyperformance_raw_output": "/Users/adpena/PycharmProjects/cinderx-community/data/runs/2026-02-19/Alejandros-MacBook-Pro/cpython-cinderx/pyperformance-raw-20260219T170050Z.json",
+  "run_id": "20260219T170050Z",
+  "runtime": "cpython-cinderx",
+  "runtime_details": {
+    "abiflags": "",
+    "build": "('main', 'Feb  3 2026 15:32:20')",
+    "compiler": "Clang 17.0.0 (clang-1700.6.3.2)",
+    "config_args": "'--prefix=/opt/homebrew/opt/python@3.14' '--enable-ipv6' '--datarootdir=/opt/homebrew/opt/python@3.14/share' '--datadir=/opt/homebrew/opt/python@3.14/share' '--without-ensurepip' '--enable-loadable-sqlite-extensions' '--with-openssl=/opt/homebrew/opt/openssl@3' '--enable-optimizations' '--with-system-expat' '--with-system-libmpdec' '--with-readline=editline' '--with-lto' '--enable-framework=/opt/homebrew/opt/python@3.14/Frameworks' '--with-dtrace' '--with-dbmliborder=ndbm' 'MACOSX_DEPLOYMENT_TARGET=26' 'CFLAGS_NODIST=-I/opt/homebrew/include' 'LDFLAGS_NODIST=-L/opt/homebrew/lib -Wl,-rpath,/opt/homebrew/lib' 'CPPFLAGS=-I/opt/homebrew/include' 'py_cv_module__tkinter=n/a' 'PKG_CONFIG_PATH=/opt/homebrew/opt/pkgconf/lib/pkgconfig:/opt/homebrew/opt/mpdecimal/lib/pkgconfig:/opt/homebrew/opt/openssl@3/lib/pkgconfig:/opt/homebrew/opt/readline/lib/pkgconfig:/opt/homebrew/opt/sqlite/lib/pkgconfig:/opt/homebrew/opt/xz/lib/pkgconfig:/opt/homebrew/opt/lz4/lib/pkgconfig:/opt/homebrew/opt/zstd/lib/pkgconfig' 'PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig:/opt/homebrew/Library/Homebrew/os/mac/pkgconfig/26' 'CC=clang'",
+    "implementation": "CPython",
+    "version": "3.14.3"
+  },
+  "runtime_label": "CPython + CinderX",
+  "runtime_source": "provided",
+  "runtime_version": "Python 3.14.3 (main, Feb  3 2026, 15:32:20) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "startup_mean_seconds": 0.025062,
+  "startup_samples_seconds": [
+    0.024481,
+    0.02464,
+    0.026065
+  ],
+  "startup_stdev_seconds": 0.0008722539767751147,
+  "suite": "pyperformance"
+}

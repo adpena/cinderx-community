@@ -1,0 +1,43 @@
+---
+title: Introspection Overview
+---
+
+# Introspection Overview
+
+:::info Provenance
+Built from `cinderx` @ `31bca9f3156b78cca3c6b36000c42c48f5ddf037` on `2026-02-19T18:40:28.075072+00:00`.
+
+Source: [https://github.com/facebookincubator/cinderx](https://github.com/facebookincubator/cinderx)
+:::
+
+## Inventory Counts
+
+| Metric                | Value |
+| --------------------- | ----- |
+| Python files scanned  | 777   |
+| C/C++ files scanned   | 405   |
+| Flags discovered      | 53    |
+| Test files classified | 745   |
+| Python modules        | 777   |
+| Python classes        | 755   |
+| Python functions      | 634   |
+| Exported C symbols    | 2     |
+| Test groups           | 4     |
+
+## Classification
+
+- `confirmed`: Values directly extracted from source files and tests.
+- `inferred`: Runtime requirements inferred from textual heuristics.
+- `unknown`: Build/runtime behavior requiring execution-time validation.
+
+## Limitations
+
+- `Python and C/C++ inventories are static analysis outputs.`
+- `C/C++ symbol extraction uses regex fallback rather than full Clang AST parsing.`
+- `Test runtime requirements are inferred from textual patterns.`
+
+## Related Generated Pages
+
+- `generated/symbol-inventory`
+- `generated/build-options`
+- `generated/test-taxonomy`

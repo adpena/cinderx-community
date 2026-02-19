@@ -1,0 +1,56 @@
+---
+title: Static Python And Runtime Behavior
+---
+
+# Static Python And Runtime Behavior
+
+<svg viewBox="0 0 940 230" width="100%" role="img" aria-label="Static Python runtime flow">
+  <rect x="20" y="40" width="200" height="60" rx="8" fill="#f2f5f7" stroke="#0f172a" />
+  <text x="120" y="75" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Typed Python Module
+  </text>
+  <rect x="260" y="40" width="210" height="60" rx="8" fill="#fdf6e3" stroke="#0f172a" />
+  <text x="365" y="75" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Static Compiler Emits
+  </text>
+  <text x="365" y="93" textAnchor="middle" fontSize="12" fill="#0f172a">
+    specialized opcodes
+  </text>
+  <rect x="510" y="40" width="200" height="60" rx="8" fill="#e8f5e9" stroke="#0f172a" />
+  <text x="610" y="75" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Frame Evaluator + JIT
+  </text>
+  <rect x="750" y="40" width="170" height="60" rx="8" fill="#eef2ff" stroke="#0f172a" />
+  <text x="835" y="75" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Runtime Checks
+  </text>
+  <rect x="250" y="145" width="430" height="55" rx="8" fill="#fff7ed" stroke="#0f172a" />
+  <text x="465" y="176" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Strict Loader init: frame evaluator + module watcher + SP audit hook
+  </text>
+  <path d="M220 70 L260 70" stroke="#0f172a" strokeWidth="2" />
+  <path d="M470 70 L510 70" stroke="#0f172a" strokeWidth="2" />
+  <path d="M710 70 L750 70" stroke="#0f172a" strokeWidth="2" />
+  <path d="M465 100 L465 145" stroke="#0f172a" strokeWidth="2" />
+</svg>
+
+## Confirmed By Code/Test
+
+- Static Python is documented as a specialized bytecode compiler that uses type annotations and emits specialized opcodes.
+  Source: [cinderx/Docs/StaticPython/README.md#L3](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Docs/StaticPython/README.md#L3)
+- The doc explicitly ties Static Python opcode specialization to JIT optimization and runtime checks.
+  Source: [cinderx/Docs/StaticPython/README.md#L37](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Docs/StaticPython/README.md#L37)
+- Static/strict loader bootstrap calls `install_frame_evaluator()`, `watch_sys_modules()`, and `install_sp_audit_hook()`.
+  Source: [cinderx/PythonLib/cinderx/compiler/strict/loader.py#L793](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/PythonLib/cinderx/compiler/strict/loader.py#L793)
+- Runtime vectorcall dispatch checks `CI_CO_STATICALLY_COMPILED` and routes static functions through `Ci_StaticFunction_Vectorcall`.
+  Source: [cinderx/Interpreter/interpreter_base.cpp#L21](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Interpreter/interpreter_base.cpp#L21)
+- Removing the frame evaluator is documented as dangerous because Static Python-compiled code may not run with default CPython evaluation.
+  Source: [cinderx/\_cinderx-lib.cpp#L937](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/_cinderx-lib.cpp#L937)
+
+## Inferred / Hypothesis
+
+- Inference: Static Python correctness relies on tightly coupled compile-time assumptions plus runtime guard checks, rather than compile-time-only guarantees.
+
+## Unknown Yet
+
+- Exact guard-elision behavior under deeply nested static call graphs requires empirical tracing and benchmark evidence.

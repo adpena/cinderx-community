@@ -1,0 +1,86 @@
+{
+  "benchmarks": [
+    {
+      "benchmark": "nbody",
+      "compile_time_seconds": null,
+      "description": "pyperformance benchmark: nbody (n-body benchmark)",
+      "mean_seconds": 0.4072887418034952,
+      "memory_rss_bytes": 29540352,
+      "samples": [
+        0.37051645800238475,
+        0.33132016702438705,
+        0.629995291994419,
+        0.8208111250132788,
+        0.4159229159995448,
+        0.5240000830090139,
+        0.3293906250037253,
+        0.3553499169938732,
+        0.3375596670084633,
+        0.297797500010347,
+        0.3051294170145411,
+        0.3141915420128498,
+        0.36644641699967906,
+        0.363210083974991,
+        0.403277583012823,
+        0.3931319999974221,
+        0.4062912499939557,
+        0.3703272920101881,
+        0.40318958400166593,
+        0.4079159169923514
+      ],
+      "stdev_seconds": 0.1238314212818996,
+      "warmups": [
+        0.3190280410053674,
+        0.3127400840166956,
+        0.33882479200838134,
+        0.31568262501969,
+        0.6239669579954352,
+        0.5613808330090251,
+        0.36453783401520923,
+        0.3098162499954924,
+        0.3443484159943182,
+        0.33612466699560173,
+        0.38958562500192784,
+        0.3833072919806,
+        0.39712912499089725
+      ],
+      "workload_class": "compute-bound-numeric"
+    }
+  ],
+  "generated_at_utc": "2026-02-19T18:33:05.871667+00:00",
+  "pyperformance_command": [
+    "/Users/adpena/PycharmProjects/cinderx-community/.venv/bin/python",
+    "-m",
+    "pyperformance",
+    "run",
+    "--python",
+    "/Users/adpena/.local/share/uv/python/cpython-3.14.3-macos-aarch64-none/bin/python3.14",
+    "--output",
+    "/Users/adpena/PycharmProjects/cinderx-community/data/runs/2026-02-19/Alejandros-MacBook-Pro/cpython/pyperformance-raw-20260219T183305Z.json",
+    "--fast",
+    "--benchmarks",
+    "nbody"
+  ],
+  "pyperformance_raw_output": "/Users/adpena/PycharmProjects/cinderx-community/data/runs/2026-02-19/Alejandros-MacBook-Pro/cpython/pyperformance-raw-20260219T183305Z.json",
+  "run_id": "20260219T183305Z",
+  "runtime": "cpython",
+  "runtime_details": {
+    "abiflags": "",
+    "build": "('main', 'Feb 12 2026 00:29:58')",
+    "compiler": "Clang 21.1.4 ",
+    "config_args": "'--build=aarch64-apple-darwin' '--host=aarch64-apple-darwin' '--prefix=/install' '--with-openssl=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps' '--with-system-expat' '--with-system-libmpdec' '--without-ensurepip' '--with-tail-call-interp' '--enable-shared' '--with-mimalloc' '--enable-optimizations' '--enable-experimental-jit=yes-off' '--with-lto' '--with-build-python=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/host/bin/python3.14' 'ac_cv_lib_intl_textdomain=no' 'ac_cv_func_ptsname_r=no' 'ac_cv_func_explicit_bzero=no' '--with-dbmliborder=ndbm' 'build_alias=aarch64-apple-darwin' 'host_alias=aarch64-apple-darwin' 'PKG_CONFIG=pkg-config --static' 'PKG_CONFIG_PATH=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps/share/pkgconfig:/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps/lib/pkgconfig' 'CC=clang' 'CFLAGS=-O3 -arch arm64 -mmacosx-version-min=11.0 -Wno-nullability-completeness -Wno-expansion-to-defined -Wno-undef-prefix -fPIC -Werror=unguarded-availability-new' 'LDFLAGS=-arch arm64 -mmacosx-version-min=11.0 -LModules/_hacl -Wl,-headerpad,40' 'CPPFLAGS=-O3 -arch arm64 -mmacosx-version-min=11.0 -Wno-nullability-completeness -Wno-expansion-to-defined -Wno-undef-prefix -fPIC -Werror=unguarded-availability-new' 'PROFILE_TASK=-m test --pgo --ignore test_json'",
+    "implementation": "CPython",
+    "version": "3.14.3"
+  },
+  "runtime_label": "CPython baseline",
+  "runtime_source": "required",
+  "runtime_version": "Python 3.14.3 (main, Feb 12 2026, 00:29:58) [Clang 21.1.4 ]",
+  "startup_mean_seconds": 0.050317,
+  "startup_samples_seconds": [
+    0.048763,
+    0.049477,
+    0.052711
+  ],
+  "startup_stdev_seconds": 0.0021037766041098567,
+  "suite": "pyperformance"
+}

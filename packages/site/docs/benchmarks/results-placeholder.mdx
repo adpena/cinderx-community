@@ -1,0 +1,29 @@
+---
+title: Results dashboard
+---
+
+import BenchSummaryDashboard from '@site/src/components/BenchSummaryDashboard';
+
+# Results dashboard
+
+This page renders benchmark summaries published under `data/summary/*.json` and mirrored to
+`packages/site/static/data/summary/*.json`.
+
+## Publication model
+
+- One machine-readable summary artifact per run (JSON)
+- Raw runtime artifacts linked from the summary payload
+- Commit SHAs and machine metadata included in every run
+- Speedup values are always relative to the baseline runtime in the same run
+- CinderX-first policy is enforceable via `--require-cinderx-baseline` for comparison runs
+- Includes a dedicated `Compare vs CinderX` preset with a per-benchmark delta table
+- Includes per-benchmark statistical fields (`p_value`, optional RSS, optional compile time) in dashboard tables
+- The `Compare vs CinderX` preset is only active for summaries that actually include a CinderX baseline runtime
+- Runtime speedup charts are intentionally hidden for non-CinderX-baselined summaries to avoid CPython-framed headline comparisons
+
+<BenchSummaryDashboard />
+
+:::info Scope
+The smoke suite is a reproducibility sanity check, not a standalone performance claim.
+Use full suites plus controlled environments before publishing headline comparisons.
+:::

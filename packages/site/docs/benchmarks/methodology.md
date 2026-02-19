@@ -1,0 +1,80 @@
+---
+title: Methodology
+---
+
+# Methodology
+
+Our benchmarking policy starts with reproducibility and comparability.
+
+pyperformance is designed for running and comparing Python performance benchmarks, and its docs emphasize consistent benchmarking workflows.
+
+Source: [pyperformance documentation](https://pyperformance.readthedocs.io/)
+
+## Measurement principles
+
+- Pin environment details (CPU, OS, compiler, Python build)
+- Record runtime/version metadata for every run
+- Use repeated measurements and compare distributions, not one-off runs
+- Publish benchmark commands and raw outputs alongside summaries
+- Separate microbenchmarks from real-application results
+
+## Runtime modes
+
+- `smoke` mode: fast sanity checks with reduced samples; suitable for CI gates and output-shape validation.
+- `pyperformance` mode: real pyperformance execution with normalized ingestion and per-benchmark stats.
+- CI fast mode for pyperformance currently scopes to a representative benchmark subset (`nbody`) to keep
+  validation runs practical.
+- `--cpython-cinderx` is strictly validated; if the runtime does not expose CinderX (`import cinderx`),
+  the run fails instead of labeling it as a CinderX baseline.
+
+Example smoke run with CinderX baseline plus comparison runtimes:
+
+```bash
+cxc bench run \
+  --suite smoke \
+  --python /path/to/python3.14 \
+  --cpython-cinderx /path/to/cinderx-python \
+  --pypy /path/to/pypy3 \
+  --nuitka /path/to/nuitka \
+  --require-cinderx-baseline \
+  --ci-mode
+```
+
+## Reproducibility guardrails
+
+`cxc bench run` records guardrail checks in run metadata:
+
+- CPU affinity visibility (warns when not pinned)
+- background load checks (warns when host load is high)
+- explicit notes for turbo/thermal state (manual confirmation required)
+
+You can enforce guardrails with `--enforce-guardrails` to fail noisy/unsafe runs.
+
+## Output model
+
+- Raw artifacts: `data/runs/<date>/<machine>/<runtime>/...`
+- Normalized summaries: `data/summary/*.json`
+- Static site mirror: `packages/site/static/data/summary/*.json`
+
+Each summary includes:
+
+- machine metadata and timestamp
+- runtime/tool versions
+- baseline-relative speedup and per-benchmark p-value estimates
+- startup-time metrics separated from steady-state benchmark timings
+- optional RSS and compile-time metrics when adapters expose them
+
+## Publish guard
+
+Use `cxc bench verify-publish` before publishing benchmark artifacts. It fails unless required
+latest summaries are truly CinderX-baselined and policy-enforced.
+It also enforces that host/toolchain/guardrail metadata is present for report transparency.
+
+## Local publish path
+
+Local benchmark publication is supported when you:
+
+- run with a real CinderX runtime (`--cpython-cinderx`) and `--require-cinderx-baseline`
+- keep full metadata in the generated summaries
+- pass `cxc bench verify-publish` (use `--require-suite smoke` for smoke-only local publications)
+- export metadata dossiers with `cxc bench export-dossier` (or `make bench-dossier`) for report attachment

@@ -1,0 +1,60 @@
+---
+title: JIT Pipeline
+---
+
+# JIT Pipeline
+
+<svg viewBox="0 0 980 230" width="100%" role="img" aria-label="CinderX JIT pipeline">
+  <rect x="20" y="35" width="150" height="60" rx="8" fill="#f2f5f7" stroke="#0f172a" />
+  <text x="95" y="70" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Python Function
+  </text>
+  <rect x="200" y="35" width="150" height="60" rx="8" fill="#fff7ed" stroke="#0f172a" />
+  <text x="275" y="70" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Preloader
+  </text>
+  <rect x="380" y="35" width="180" height="60" rx="8" fill="#fdf6e3" stroke="#0f172a" />
+  <text x="470" y="70" textAnchor="middle" fontSize="14" fill="#0f172a">
+    compile_func()
+  </text>
+  <rect x="590" y="35" width="180" height="60" rx="8" fill="#e8f5e9" stroke="#0f172a" />
+  <text x="680" y="70" textAnchor="middle" fontSize="14" fill="#0f172a">
+    compiler().Compile()
+  </text>
+  <rect x="800" y="35" width="160" height="60" rx="8" fill="#eef2ff" stroke="#0f172a" />
+  <text x="880" y="70" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Attach / Finalize
+  </text>
+  <rect x="320" y="140" width="340" height="60" rx="8" fill="#f3f4f6" stroke="#0f172a" />
+  <text x="490" y="170" textAnchor="middle" fontSize="14" fill="#0f172a">
+    Frame Evaluator Must Be Installed
+  </text>
+  <path d="M170 65 L200 65" stroke="#0f172a" strokeWidth="2" />
+  <path d="M350 65 L380 65" stroke="#0f172a" strokeWidth="2" />
+  <path d="M560 65 L590 65" stroke="#0f172a" strokeWidth="2" />
+  <path d="M770 65 L800 65" stroke="#0f172a" strokeWidth="2" />
+  <path d="M490 95 L490 140" stroke="#0f172a" strokeWidth="2" />
+</svg>
+
+## Confirmed By Code/Test
+
+- JIT preloading is explicitly documented as the phase where arbitrary Python execution is allowed.
+  Source: [cinderx/Docs/Jit/preloading.md#L3](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Docs/Jit/preloading.md#L3)
+- `compile_func()` preloads dependencies, then compiles each target preloader.
+  Source: [cinderx/Jit/pyjit.cpp#L3062](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Jit/pyjit.cpp#L3062)
+- The backend compilation step calls `jit_ctx->compiler().Compile(preloader)`.
+  Source: [cinderx/Jit/pyjit.cpp#L3860](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Jit/pyjit.cpp#L3860)
+- CinderX installs frame evaluation via `_PyInterpreterState_SetEvalFrameFunc(..., Ci_EvalFrame)`.
+  Source: [cinderx/Interpreter/interpreter_base.cpp#L50](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/Interpreter/interpreter_base.cpp#L50)
+- Public extension entrypoints describe frame-evaluator install/remove semantics and safety caveats.
+  Source: [cinderx/\_cinderx-lib.cpp#L925](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/_cinderx-lib.cpp#L925)
+- Tests assert install/remove idempotence and JIT interactions (`auto`, `compile_after_n_calls`, `force_compile`, `lazy_compile`).
+  Source: [cinderx/PythonLib/test_cinderx/test_frame_evaluator.py#L22](https://github.com/facebookincubator/cinderx/blob/31bca9f3156b78cca3c6b36000c42c48f5ddf037/cinderx/PythonLib/test_cinderx/test_frame_evaluator.py#L22)
+
+## Inferred / Hypothesis
+
+- Inference: preloading is the guardrail that separates side-effect-tolerant work from side-effect-intolerant compilation/lowering.
+
+## Unknown Yet
+
+- Batch-compilation scheduling quality under mixed static/dynamic workloads needs benchmark-backed analysis (Phase 3).

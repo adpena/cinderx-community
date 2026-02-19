@@ -1,0 +1,22 @@
+# Node / site
+node_modules/
+packages/site/.docusaurus/
+packages/site/build/
+packages/site/.cache/
+packages/site/.turbo/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Upstream cache/artifacts
+.cache/
+
+# Logs and misc
+.DS_Store
+*.log

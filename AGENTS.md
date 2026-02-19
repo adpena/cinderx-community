@@ -1,0 +1,69 @@
+# Repository Guidelines
+
+## Project Structure & Module Organization
+This monorepo has two active workstreams:
+- `packages/site/`: Docusaurus docs site. Content lives in `packages/site/docs/`, blog posts in `packages/site/blog/`, React UI in `packages/site/src/`, and assets in `packages/site/static/`.
+- `python/`: `cinderx_community` tooling package. CLI entrypoint is `python/cinderx_community/cli.py`; upstream tracking is in `python/cinderx_community/upstream.py`; benchmark/research stubs are in `python/cinderx_community/bench/` and `python/cinderx_community/research/`; tests are in `python/cinderx_community/tests/`.
+
+Repo-level governance and automation live in `.github/`, `README.md`, `CONTRIBUTING.md`, and `SECURITY.md`.
+
+## Build, Test, and Development Commands
+- `make dev`: install site deps and run docs locally on port `3000`.
+- `make fmt`: format JS/TS/MD(X)/CSS/JSON/YAML and Python.
+- `make lint`: TypeScript + Prettier checks for site, Ruff checks for Python.
+- `make test`: run `pytest` for Python tooling.
+- `make build`: produce static site output in `packages/site/build`.
+- `make clean`: remove local build/cache/venv artifacts.
+- `make python-dev-cinderx`: install Python tooling with optional `cinderx` extra metadata.
+- `make cinderx-env-check`: print local CinderX runtime/toolchain readiness diagnostics.
+- `make cinderx-install-local`: attempt local CinderX install into `.venv` (`--no-build-isolation`).
+- `make bench-toolchain`: install local benchmark dependencies (`pyperformance`, `nuitka`).
+- `make bench-smoke-local`: run local smoke suite in CI-shape mode.
+- `make bench-pyperformance-local`: run local pyperformance suite in CI-shape mode.
+- `make bench-smoke-local-cinderx`: run local smoke suite with required CinderX baseline (`CINDERX_PYTHON=...`).
+- `make bench-pyperformance-local-cinderx`: run local pyperformance suite with required CinderX baseline (`CINDERX_PYTHON=...`).
+- `make bench-publish-check`: enforce CinderX-baselined publish guard for latest benchmark summaries.
+- `make bench-dossier`: export benchmark metadata dossier JSON under `data/summary/reports/`.
+- Python environments and package installs are managed with `uv` (see setup below).
+
+First-time setup:
+```bash
+uv python install 3.14
+uv venv --python 3.14 .venv
+corepack enable
+pnpm -C packages/site install
+uv pip install --python .venv/bin/python -e ./python[dev]
+uv add --project ./python --optional cinderx cinderx --no-sync
+uv pip install --python .venv/bin/python pyperformance nuitka
+```
+
+## Python Package Management (uv-only)
+- Use `uv` for all Python runtime and dependency operations in this repo.
+- Add/update dependencies in `python/` with `uv add --project ./python ...` (use `--optional <extra>` for optional groups).
+- Install into the workspace venv with `uv pip install --python .venv/bin/python ...`.
+- Use `uv python install` and `uv venv` for interpreter and virtualenv lifecycle.
+- Do not use `pip`, `python -m pip`, `poetry`, or `pipenv` for project dependency management here.
+- If adding optional `cinderx` metadata without syncing native build, use:
+  - `uv add --project ./python --optional cinderx cinderx --no-sync`
+
+## Coding Style & Naming Conventions
+- Follow `.editorconfig`: UTF-8, LF, trailing whitespace trimmed, final newline.
+- Indentation: 2 spaces by default, 4 for `*.py`, tabs in `Makefile`.
+- Python: Ruff is the source of truth (`line-length = 100`, `target-version = py314`).
+- Web/docs: Prettier formatting; keep docs filenames kebab-case, React components PascalCase, Python functions/modules snake_case.
+
+## Testing Guidelines
+- Framework: `pytest`.
+- Test files: `test_*.py` under `python/cinderx_community/tests/`.
+- Keep tests deterministic and quick; do not add heavyweight benchmark execution to CI in bootstrap phases.
+
+## Commit & Pull Request Guidelines
+Local workspace snapshot may not include `.git` metadata; use Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`) moving forward.
+- Keep PRs focused and reviewable.
+- Before opening PRs, run `make lint test build`.
+- Update docs for behavior changes and cite sources for CinderX claims (or mark as TODO/hypothesis).
+- Do not commit secrets or generated site build artifacts.
+
+## Security & Configuration Tips
+- Follow `SECURITY.md` for vulnerability reporting.
+- Do not vendor the upstream CinderX repo; use `cxc upstream ...` commands and local cache paths under `.cache/upstream/`.

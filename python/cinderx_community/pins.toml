@@ -1,0 +1,10 @@
+# Managed by cxc upstream pin. Edit manually with care.
+
+[repos]
+
+[repos.cinderx]
+repo_url = "https://github.com/facebookincubator/cinderx.git"
+commit_sha = "31bca9f3156b78cca3c6b36000c42c48f5ddf037"
+clone_timestamp_utc = "2026-02-19T15:53:52.396865+00:00"
+destination = ".cache/upstream/cinderx"
+tags = ["introspection-docs", "phase-2"]

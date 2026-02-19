@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling>=1.28.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cinderx-community"
+version = "0.1.0"
+description = "Community tooling scaffold for CinderX docs, compatibility, and benchmarks"
+readme = "README.md"
+requires-python = ">=3.14"
+authors = [{ name = "CinderX Community Contributors" }]
+dependencies = [
+  "typer>=0.24.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9.0.2",
+  "ruff>=0.15.1"
+]
+cinderx = [
+  "cinderx>=2026.2.2.0",
+]
+
+[project.scripts]
+cxc = "cinderx_community.cli:app"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["cinderx_community/tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

@@ -1,0 +1,8 @@
+{
+  "available": false,
+  "generated_at_utc": "2026-02-19T17:00:50.859713+00:00",
+  "reason": "not provided",
+  "runtime": "cython",
+  "source": "none",
+  "suite": "pyperformance"
+}

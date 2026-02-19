@@ -1,0 +1,9 @@
+{
+  "available": true,
+  "executed": false,
+  "generated_at_utc": "2026-02-19T16:46:17.238318+00:00",
+  "reason": "nuitka adapter failed (Command failed: /Users/adpena/PycharmProjects/cinderx-community/.venv/bin/nuitka --onefile --output-dir /Users/adpena/PycharmProjects/cinderx-community/data/runs/2026-02-19/Alejandros-MacBook-Pro/nuitka/build --output-filename smoke-worker /Users/adpena/PycharmProjects/cinderx-community/data/runs/2026-02-19/Alejandros-MacBook-Pro/nuitka/build/smoke_worker_nuitka.py\nUsage: nuitka [--mode=compilation_mode] [--run] [options] main_module.py\n\n    Note: For general plugin help (they often have their own\n    command line options too), consider the output of\n    '--help-plugins'.\n\nnuitka: error: The '--output-dir' option requires an argument with '--output-dir='.)",
+  "runtime": "nuitka",
+  "source": "provided",
+  "suite": "smoke"
+}

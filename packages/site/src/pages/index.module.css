@@ -1,0 +1,136 @@
+.page {
+  padding: 2.5rem 0 4.5rem;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(21, 49, 76, 0.13);
+  border-radius: 26px;
+  background: #f8fbff;
+  padding: clamp(1.5rem, 4vw, 3.2rem);
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  right: -52px;
+  bottom: -82px;
+  width: 256px;
+  height: 256px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath d='M138 20c-4 19-15 33-28 48-17 19-35 40-38 71-4 47 23 93 59 106 44-6 75-48 74-98-1-35-16-64-46-93-1 15-5 31-15 45-9-21-10-49-6-79Z' fill='none' stroke='%23f2b3b7' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M136 86c-3 11-10 20-17 28-11 12-22 25-24 43-3 30 14 58 35 65 27-3 46-29 45-61-1-21-9-38-25-54-1 9-4 18-9 25-5-12-6-27-5-46Z' fill='none' stroke='%23e79b3e' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  pointer-events: none;
+}
+
+.heroKicker {
+  margin: 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #2d628c;
+  font-weight: 700;
+}
+
+.heroTitle {
+  margin: 0.5rem 0 0;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.05;
+  color: #182838;
+}
+
+.heroTagline {
+  margin: 1rem 0 0;
+  max-width: 62ch;
+  font-size: 1.1rem;
+  color: #32495f;
+}
+
+.heroButtons {
+  margin-top: 1.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.section {
+  margin-top: 3rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.cards {
+  margin-top: 1rem;
+}
+
+.card {
+  border: 1px solid rgba(24, 53, 79, 0.12);
+  border-radius: 18px;
+  padding: 1rem;
+  background: #f9fcff;
+  box-shadow: 0 8px 24px rgba(22, 44, 66, 0.05);
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1b2f40;
+}
+
+.card p {
+  margin: 0.55rem 0 0;
+  color: #3a5267;
+  font-size: 0.95rem;
+}
+
+.callout {
+  margin-top: 1rem;
+  border: 1px solid rgba(27, 73, 116, 0.2);
+  background: #eaf2fb;
+  border-radius: 10px;
+  padding: 1rem;
+  color: #1b3c58;
+}
+
+.callout p {
+  margin: 0.4rem 0;
+}
+
+.references {
+  margin-top: 0.8rem;
+  font-size: 0.92rem;
+  color: #4a6177;
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 1.4rem;
+    border-radius: 16px;
+  }
+
+  .hero::before {
+    right: -58px;
+    bottom: -86px;
+    width: 190px;
+    height: 190px;
+    opacity: 0.16;
+  }
+
+  .heroButtons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

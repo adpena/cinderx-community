@@ -1,0 +1,106 @@
+{
+  "benchmarks": [
+    {
+      "benchmark": "dynamic_dispatch",
+      "description": "Attribute lookup and dynamic dispatch loops.",
+      "loops": 8000,
+      "mean_seconds": 0.0015883053323098768,
+      "samples": [
+        0.0018143329943995923,
+        0.0011342920188326389,
+        0.0018162909836973995
+      ],
+      "stdev_seconds": 0.00039318828192286986,
+      "warmups": [
+        0.0014858749927952886
+      ],
+      "workload_class": "interpreter-heavy-dynamic-dispatch"
+    },
+    {
+      "benchmark": "compute_numeric",
+      "description": "Pure-Python numeric loop with arithmetic accumulation.",
+      "loops": 65000,
+      "mean_seconds": 0.005263541990037386,
+      "samples": [
+        0.005749584001023322,
+        0.004645999986678362,
+        0.005395041982410476
+      ],
+      "stdev_seconds": 0.0005634213389418493,
+      "warmups": [
+        0.005475292011396959
+      ],
+      "workload_class": "compute-bound-numeric"
+    },
+    {
+      "benchmark": "serialization_json",
+      "description": "JSON encode/decode roundtrip over nested payloads.",
+      "loops": 2000,
+      "mean_seconds": 0.011918458001067242,
+      "samples": [
+        0.011355708003975451,
+        0.01473283299128525,
+        0.009666833007941023
+      ],
+      "stdev_seconds": 0.0025794582042031684,
+      "warmups": [
+        0.010246416000882164
+      ],
+      "workload_class": "serialization-heavy"
+    },
+    {
+      "benchmark": "io_tempfile",
+      "description": "Filesystem write/read roundtrip through temporary files.",
+      "loops": 140,
+      "mean_seconds": 0.031749111328584455,
+      "samples": [
+        0.03502666699932888,
+        0.03266741699189879,
+        0.027553249994525686
+      ],
+      "stdev_seconds": 0.0038203997697069322,
+      "warmups": [
+        0.024493708013324067
+      ],
+      "workload_class": "io-bound"
+    },
+    {
+      "benchmark": "hashlib_sha256",
+      "description": "Hashing loop using stdlib native extension pathways.",
+      "loops": 6000,
+      "mean_seconds": 0.004740569323378925,
+      "samples": [
+        0.00525262497831136,
+        0.005262999999104068,
+        0.003706082992721349
+      ],
+      "stdev_seconds": 0.0008959064607994212,
+      "warmups": [
+        0.0036309589922893792
+      ],
+      "workload_class": "c-extension-dominated"
+    }
+  ],
+  "generated_at_utc": "2026-02-19T16:19:32.370251+00:00",
+  "run_id": "20260219T161932Z",
+  "runtime": "cpython",
+  "runtime_details": {
+    "abiflags": "",
+    "build": "('main', 'Feb  3 2026 15:32:20')",
+    "compiler": "Clang 17.0.0 (clang-1700.6.3.2)",
+    "config_args": "'--prefix=/opt/homebrew/opt/python@3.14' '--enable-ipv6' '--datarootdir=/opt/homebrew/opt/python@3.14/share' '--datadir=/opt/homebrew/opt/python@3.14/share' '--without-ensurepip' '--enable-loadable-sqlite-extensions' '--with-openssl=/opt/homebrew/opt/openssl@3' '--enable-optimizations' '--with-system-expat' '--with-system-libmpdec' '--with-readline=editline' '--with-lto' '--enable-framework=/opt/homebrew/opt/python@3.14/Frameworks' '--with-dtrace' '--with-dbmliborder=ndbm' 'MACOSX_DEPLOYMENT_TARGET=26' 'CFLAGS_NODIST=-I/opt/homebrew/include' 'LDFLAGS_NODIST=-L/opt/homebrew/lib -Wl,-rpath,/opt/homebrew/lib' 'CPPFLAGS=-I/opt/homebrew/include' 'py_cv_module__tkinter=n/a' 'PKG_CONFIG_PATH=/opt/homebrew/opt/pkgconf/lib/pkgconfig:/opt/homebrew/opt/mpdecimal/lib/pkgconfig:/opt/homebrew/opt/openssl@3/lib/pkgconfig:/opt/homebrew/opt/readline/lib/pkgconfig:/opt/homebrew/opt/sqlite/lib/pkgconfig:/opt/homebrew/opt/xz/lib/pkgconfig:/opt/homebrew/opt/lz4/lib/pkgconfig:/opt/homebrew/opt/zstd/lib/pkgconfig' 'PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig:/opt/homebrew/Library/Homebrew/os/mac/pkgconfig/26' 'CC=clang'",
+    "implementation": "CPython",
+    "version": "3.14.3"
+  },
+  "runtime_label": "CPython baseline",
+  "runtime_source": "required",
+  "runtime_version": "Python 3.14.3 (main, Feb  3 2026, 15:32:20) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "startup_mean_seconds": 0.04102066666666667,
+  "startup_samples_seconds": [
+    0.03468,
+    0.04903,
+    0.039352
+  ],
+  "startup_stdev_seconds": 0.007319082000724769,
+  "suite": "smoke"
+}
