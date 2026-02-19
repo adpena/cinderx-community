@@ -40,74 +40,23 @@ jobs:
         id: cinderx_install
         shell: bash
         run: |
-          set +e
-          uv pip install --python .venv/bin/python cinderx
-          install_exit=$?
-          set -e
-          if [[ "$install_exit" -ne 0 ]]; then
-            echo "::warning::Hosted CinderX install failed; workflow will run CI-shape mode."
-            echo "installed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "::group::Hosted CinderX diagnostics"
-          uname -a || true
-          cat /etc/os-release || true
-          echo "ImageOS=${ImageOS:-unknown}"
-          echo "ImageVersion=${ImageVersion:-unknown}"
-          .venv/bin/python -VV || true
-          .venv/bin/python - <<'PY' || true
-          import importlib.util
-          import platform
-          import sys
-
-          print(f"executable={sys.executable}")
-          print(f"python={sys.version}")
-          print(f"platform={platform.platform()}")
-          print(f"libc={platform.libc_ver()}")
-          spec = importlib.util.find_spec("cinderx")
-          print(f"cinderx_spec={getattr(spec, 'origin', None)}")
-          PY
-          mapfile -t cinderx_so < <(find .venv -type f -name 'cinderx*.so' 2>/dev/null || true)
-          for so_file in "${cinderx_so[@]}"; do
-            echo "ldd for ${so_file}"
-            ldd "${so_file}" || true
-          done
-          echo "::endgroup::"
-
-          set +e
-          has_module="$(.venv/bin/python - <<'PY'
-          try:
-              import cinderx  # noqa: F401
-          except Exception:
-              print("false")
-          else:
-              print("true")
-          PY
-          )"
-          probe_exit=$?
-          set -e
-          if [[ "$probe_exit" -ne 0 ]]; then
-            echo "::warning::CinderX import probe crashed/failed on hosted runner; falling back to CI-shape mode."
-            echo "installed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "installed=$has_module" >> "$GITHUB_OUTPUT"
-          if [[ "$has_module" == "true" ]]; then
-            echo "::notice::Hosted runner CinderX install/import succeeded."
-          else
-            echo "::warning::CinderX package installed but import failed; falling back to CI-shape mode."
-          fi
+          bash scripts/ci/install_and_probe_cinderx.sh \
+            --python .venv/bin/python \
+            --mode permissive \
+            --diagnostics-dir .cache/cinderx-diagnostics
 
       - name: Resolve benchmark runtimes
         id: runtimes
         shell: bash
         run: |
-          python_bin="$(.venv/bin/python - <<'PY'
-          import sys
-          print(sys.executable)
-          PY
-          )"
+          python_bin="${{ steps.cinderx_install.outputs.python_bin }}"
+          if [[ -z "$python_bin" ]]; then
+            python_bin="$(.venv/bin/python - <<'PY'
+            import sys
+            print(sys.executable)
+            PY
+            )"
+          fi
           cinderx_bin=""
           has_cinderx="false"
           if [[ -n "${CINDERX_PYTHON:-}" ]]; then
@@ -115,15 +64,26 @@ jobs:
             has_cinderx="true"
             echo "::notice::Using CINDERX_PYTHON for CinderX-baselined comparison runs."
           elif [[ "${{ steps.cinderx_install.outputs.installed }}" == "true" ]]; then
-            cinderx_bin="$python_bin"
+            cinderx_bin="${{ steps.cinderx_install.outputs.cinderx_bin }}"
+            if [[ -z "$cinderx_bin" ]]; then
+              cinderx_bin="$python_bin"
+            fi
             has_cinderx="true"
-            echo "::notice::Hosted runner .venv Python appears CinderX-capable."
+            echo "::notice::Hosted runner .venv Python appears CinderX-capable (attempt=${{ steps.cinderx_install.outputs.selected_attempt }})."
           else
             echo "::warning::No usable CinderX runtime found. Running CI-shape validation without CinderX comparison publication args."
           fi
           echo "python_bin=$python_bin" >> "$GITHUB_OUTPUT"
           echo "cinderx_bin=$cinderx_bin" >> "$GITHUB_OUTPUT"
           echo "has_cinderx=$has_cinderx" >> "$GITHUB_OUTPUT"
+
+      - name: Upload hosted-runner CinderX diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinderx-diagnostics-hosted-runner
+          path: .cache/cinderx-diagnostics
+          if-no-files-found: warn
 
       - name: Diagnostics lane policy note
         run: |
@@ -208,52 +168,18 @@ jobs:
         id: cinderx_strict
         shell: bash
         run: |
-          uv pip install --python .venv/bin/python cinderx
+          bash scripts/ci/install_and_probe_cinderx.sh \
+            --python .venv/bin/python \
+            --mode strict \
+            --diagnostics-dir .cache/cinderx-diagnostics
 
-          echo "::group::Pinned CinderX diagnostics"
-          uname -a || true
-          cat /etc/os-release || true
-          echo "ImageOS=${ImageOS:-unknown}"
-          echo "ImageVersion=${ImageVersion:-unknown}"
-          .venv/bin/python -VV
-          .venv/bin/python - <<'PY'
-          import importlib.util
-          import platform
-          import sys
-
-          print(f"executable={sys.executable}")
-          print(f"python={sys.version}")
-          print(f"platform={platform.platform()}")
-          print(f"libc={platform.libc_ver()}")
-          spec = importlib.util.find_spec("cinderx")
-          print(f"cinderx_spec={getattr(spec, 'origin', None)}")
-          PY
-          mapfile -t cinderx_so < <(find .venv -type f -name 'cinderx*.so' 2>/dev/null || true)
-          for so_file in "${cinderx_so[@]}"; do
-            echo "ldd for ${so_file}"
-            ldd "${so_file}" || true
-          done
-          echo "::endgroup::"
-
-          set +e
-          .venv/bin/python - <<'PY'
-          import cinderx  # noqa: F401
-          print("cinderx import probe succeeded")
-          PY
-          probe_exit=$?
-          set -e
-          if [[ "$probe_exit" -ne 0 ]]; then
-            echo "::error::Pinned publishable job could not import CinderX. Aborting publishable baseline run."
-            exit 1
-          fi
-
-          python_bin="$(.venv/bin/python - <<'PY'
-          import sys
-          print(sys.executable)
-          PY
-          )"
-          echo "python_bin=$python_bin" >> "$GITHUB_OUTPUT"
-          echo "cinderx_bin=$python_bin" >> "$GITHUB_OUTPUT"
+      - name: Upload pinned-runner CinderX diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cinderx-diagnostics-pinned-runner
+          path: .cache/cinderx-diagnostics
+          if-no-files-found: warn
 
       - name: Prepare clean output directories
         run: |
@@ -382,6 +308,10 @@ jobs:
           fi
 
           curated_summary_dir="$(mktemp -d)"
+          previous_latest_dir="$(mktemp -d)"
+          if [[ -d "${latest_dir}" ]]; then
+            cp -R "${latest_dir}/." "${previous_latest_dir}/" || true
+          fi
 
           smoke_run_id="$(jq -r '.run_id // empty' "${summary_root}/latest-smoke.json" 2>/dev/null || true)"
           pyperf_run_id="$(jq -r '.run_id // empty' "${summary_root}/latest-pyperformance.json" 2>/dev/null || true)"
@@ -433,6 +363,46 @@ jobs:
             mkdir -p "${curated_summary_dir}/reports"
             find "${summary_root}/reports" -maxdepth 1 -type f -name '*metadata-dossier.json' -exec cp {} "${curated_summary_dir}/reports/" \;
           fi
+
+          for suite in smoke pyperformance; do
+            latest_name="latest-${suite}.json"
+            if [[ -f "${curated_summary_dir}/${latest_name}" ]]; then
+              continue
+            fi
+            if [[ ! -f "${previous_latest_dir}/${latest_name}" ]]; then
+              continue
+            fi
+
+            cp "${previous_latest_dir}/${latest_name}" "${curated_summary_dir}/${latest_name}"
+
+            previous_file="$(jq -r --arg suite "${suite}" '(.entries // []) | map(select(.suite == $suite)) | .[0].file // empty' "${previous_latest_dir}/index.json" 2>/dev/null || true)"
+            if [[ -n "${previous_file}" && -f "${previous_latest_dir}/${previous_file}" ]]; then
+              cp "${previous_latest_dir}/${previous_file}" "${curated_summary_dir}/${previous_file}"
+            fi
+
+            previous_entry="$(jq -c --arg suite "${suite}" '(.entries // []) | map(select(.suite == $suite)) | .[0] // empty' "${previous_latest_dir}/index.json" 2>/dev/null || true)"
+            if [[ -n "${previous_entry}" ]]; then
+              tmp_index="$(mktemp)"
+              jq \
+                --argjson previous "${previous_entry}" \
+                --arg suite "${suite}" \
+                '
+                .entries = (
+                  (.entries // [])
+                  | if any(.[]?; .suite == $suite) then . else . + [$previous] end
+                )
+                ' \
+                "${curated_summary_dir}/index.json" > "${tmp_index}"
+              mv "${tmp_index}" "${curated_summary_dir}/index.json"
+            fi
+
+            if [[ -d "${previous_latest_dir}/reports" ]]; then
+              mkdir -p "${curated_summary_dir}/reports"
+              find "${previous_latest_dir}/reports" -maxdepth 1 -type f -name "${suite}-metadata-dossier.json" -exec cp {} "${curated_summary_dir}/reports/" \;
+            fi
+
+            echo "::notice::Carried forward previous latest ${suite} summary into history/latest."
+          done
 
           mkdir -p "${dest_summary_dir}"
           cp -R "${curated_summary_dir}/." "${dest_summary_dir}/"
