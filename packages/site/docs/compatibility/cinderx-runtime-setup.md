@@ -38,6 +38,19 @@ uv pip install --python .venv/bin/python setuptools
 uv pip install --python .venv/bin/python --no-build-isolation cinderx
 ```
 
+If the default path fails on macOS arm64 with bundled `fmt` compile errors (`malloc` / `free`
+undeclared), retry with the validated workaround:
+
+```bash
+CXXFLAGS='-include cstdlib' CMAKE_ARGS='-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON' uv pip install --python .venv/bin/python -v --no-cache-dir --reinstall cinderx
+```
+
+Repo make wrapper:
+
+```bash
+make cinderx-install-local-macos
+```
+
 If local install succeeds, confirm:
 
 ```bash
@@ -54,16 +67,30 @@ make bench-pyperformance-local-cinderx
 
 ## Known local caveat in this workspace
 
-As of 2026-02-19 on macOS arm64 in this workspace, upstream `cinderx` source build still fails
-inside bundled `fmt` during C++ compilation (`malloc` / `free` undeclared), even after local
-prerequisites are installed. Until that upstream issue is resolved or a compatible wheel is used,
-publishable CinderX-baselined benchmark runs are blocked by design.
+As of 2026-02-19 on macOS arm64 in this workspace, default local source-build path can fail inside
+bundled `fmt` C++ compilation (`malloc` / `free` undeclared). A reproducible local workaround is
+available via `CXXFLAGS='-include cstdlib'` plus explicit `CMAKE_ARGS` (or
+`make cinderx-install-local-macos`).
+
+Additional validation notes from this workspace:
+
+- default `uv pip install cinderx` failed with the same `fmt` error
+- default `python -m pip install cinderx` failed with the same `fmt` error
+- `PYTHONPATH=src` did not change the failure mode
 
 ## Hosted-runner caveat (GitHub Actions)
 
-As of 2026-02-19 in workflow run `22196352820`, `uv pip install cinderx` on `ubuntu-latest` did
-install, but direct `import cinderx` probe crashed (exit 139). The benchmark workflow therefore
-falls back automatically to CI-shape mode instead of publishing CinderX-baselined comparisons.
+As of 2026-02-19 in workflow run `22202746458`, both:
+
+- `ubuntu-latest` diagnostics lane
+- pinned publishable lane (`ubuntu-22.04`, CPython `3.14.0`)
+
+completed `cinderx` install plus direct import probe successfully via
+`scripts/ci/install_and_probe_cinderx.sh` (`selected_attempt=default-wheel` in both lanes).
+
+Historical note: earlier run `22196352820` had an `import cinderx` crash on `ubuntu-latest`
+(exit `139`). Keep diagnostics artifacts enabled because hosted-runner image/toolchain drift can
+reintroduce regressions.
 
 ## Publishability guardrail
 

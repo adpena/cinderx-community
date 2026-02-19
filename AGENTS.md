@@ -17,6 +17,8 @@ Repo-level governance and automation live in `.github/`, `README.md`, `CONTRIBUT
 - `make python-dev-cinderx`: install Python tooling with optional `cinderx` extra metadata.
 - `make cinderx-env-check`: print local CinderX runtime/toolchain readiness diagnostics.
 - `make cinderx-install-local`: attempt local CinderX install into `.venv` (`--no-build-isolation`).
+- `make cinderx-install-local-macos`: macOS arm64 fallback install path for upstream `fmt` header failures during local `cinderx` source build.
+- `bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode permissive`: staged CinderX install + import probe + diagnostics capture (CI parity path).
 - `make bench-toolchain`: install local benchmark dependencies (`pyperformance`, `nuitka`).
 - `make bench-smoke-local`: run local smoke suite in CI-shape mode.
 - `make bench-pyperformance-local`: run local pyperformance suite in CI-shape mode.
@@ -45,6 +47,12 @@ uv pip install --python .venv/bin/python pyperformance nuitka
 - Do not use `pip`, `python -m pip`, `poetry`, or `pipenv` for project dependency management here.
 - If adding optional `cinderx` metadata without syncing native build, use:
   - `uv add --project ./python --optional cinderx cinderx --no-sync`
+- macOS arm64 local install caveat:
+  - If `uv pip install cinderx` fails with bundled `fmt` compile errors (`malloc` / `free` undeclared), use:
+    - `make cinderx-install-local-macos`
+  - Equivalent direct command:
+    - `CXXFLAGS='-include cstdlib' CMAKE_ARGS='-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON' uv pip install --python .venv/bin/python -v --no-cache-dir --reinstall cinderx`
+  - `PYTHONPATH=src` does not affect this native build failure mode.
 
 ## Coding Style & Naming Conventions
 - Follow `.editorconfig`: UTF-8, LF, trailing whitespace trimmed, final newline.
