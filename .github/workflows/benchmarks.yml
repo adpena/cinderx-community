@@ -441,6 +441,15 @@ jobs:
           mkdir -p "${latest_dir}"
           cp -R "${curated_summary_dir}/." "${latest_dir}/"
 
+          smoke_latest_path=""
+          pyperf_latest_path=""
+          if [[ -f "${curated_summary_dir}/latest-smoke.json" ]]; then
+            smoke_latest_path="history/latest/latest-smoke.json"
+          fi
+          if [[ -f "${curated_summary_dir}/latest-pyperformance.json" ]]; then
+            pyperf_latest_path="history/latest/latest-pyperformance.json"
+          fi
+
           manifest="history/index.json"
           if [[ ! -f "${manifest}" ]]; then
             cat > "${manifest}" <<'JSON'
@@ -458,8 +467,8 @@ jobs:
             --arg run_id "${GITHUB_RUN_ID}" \
             --arg sha "${GITHUB_SHA}" \
             --arg ref "${GITHUB_REF_NAME}" \
-            --arg suite_smoke "history/latest/latest-smoke.json" \
-            --arg suite_pyperf "history/latest/latest-pyperformance.json" \
+            --arg suite_smoke "${smoke_latest_path}" \
+            --arg suite_pyperf "${pyperf_latest_path}" \
             --arg run_summary_dir "${dest_summary_dir}" \
             '
             .updated_at_utc = $updated_at
@@ -471,8 +480,8 @@ jobs:
                     sha: $sha,
                     ref: $ref,
                     run_summary_dir: $run_summary_dir,
-                    latest_smoke_path: $suite_smoke,
-                    latest_pyperformance_path: $suite_pyperf
+                    latest_smoke_path: (if $suite_smoke == "" then null else $suite_smoke end),
+                    latest_pyperformance_path: (if $suite_pyperf == "" then null else $suite_pyperf end)
                   }
                 ] + (.entries // [])
               )[:250]
