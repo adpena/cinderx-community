@@ -120,7 +120,13 @@ benchmark workflow wiring.
   - Publish guard command: `cxc bench verify-publish` fails if latest required summaries are not truly CinderX-baselined/policy-enforced
   - Metadata dossier export command: `cxc bench export-dossier` emits report-ready configuration snapshots from latest summaries
 - Deliverable 6 (continuous strategy): implemented
-  - Workflow: `.github/workflows/benchmarks.yml` (manual + scheduled benchmark runs; workflow attempts hosted-runner CinderX install automatically and falls back to CI-shape mode only when unavailable; `CINDERX_PYTHON` override is also supported; CinderX-enabled runs execute `cxc bench verify-publish` before uploading publishable artifacts, non-CinderX runs are explicitly uploaded as `ci-shape` artifacts only, and metadata dossiers are exported automatically)
+  - Workflow: `.github/workflows/benchmarks.yml` (manual + scheduled benchmark runs with a dual-job strategy:
+    - `benchmark` on `ubuntu-latest` keeps CI-shape validation and gracefully falls back when hosted CinderX probe crashes/fails
+    - `benchmark_pinned_publishable` on pinned `ubuntu-22.04` + pinned CPython `3.14.0` (via `actions/setup-python`) runs strict CinderX-baselined publishable comparisons and uploads publishable artifacts)
+  - `CINDERX_PYTHON` override is supported for external CinderX runtimes
+  - CinderX-enabled runs execute `cxc bench verify-publish` before uploading publishable artifacts
+  - non-CinderX runs are explicitly uploaded as `ci-shape` artifacts only
+  - metadata dossiers are exported automatically
   - Local-free execution path is wired through make targets: `make bench-smoke-local`, `make bench-pyperformance-local`, `make bench-smoke-local-cinderx`, `make bench-pyperformance-local-cinderx`
   - Project metadata includes optional `cinderx` dependency managed via `uv` (`uv add --project ./python --optional cinderx cinderx --no-sync`)
 
@@ -135,10 +141,10 @@ Validation in this workspace:
 
 Validation caveat:
 
-- As of 2026-02-19 in this workspace, no real CinderX-enabled interpreter is available on-path.
-- Publishable CinderX-vs-runtime comparisons require a real CinderX runtime binary for `--cpython-cinderx` (or `CINDERX_PYTHON` in CI), and strict validation now enforces this.
-- `uv`-managed install attempts on 2026-02-19 (`uv pip install --python .venv/bin/python --no-build-isolation cinderx`, including Python 3.14.3 arm64) fail in upstream CinderX native build with `fmt` compile errors (`use of undeclared identifier 'malloc'/'free'`), so this workspace remains in non-publishable CI-shape mode only.
-- GitHub-hosted benchmark run `22196352820` (2026-02-19) successfully completed in CI-shape fallback mode; hosted `uv pip install cinderx` succeeded but direct `import cinderx` probe crashed (exit 139), so workflow intentionally avoided publishable CinderX-baselined mode.
+- GitHub-hosted `ubuntu-latest` + `uv python install 3.14` still reproduces a CinderX import-probe crash (`exit 139`) after successful install, so that lane remains CI-shape fallback by design.
+- Pinned lane (`ubuntu-22.04` + `actions/setup-python@v6` with CPython `3.14.0`) now produces publishable CinderX-baselined runs and passes `cxc bench verify-publish`.
+- A runtime-path bug in the harness (resolving `.venv/bin/python` symlinks to the base interpreter and losing venv site-packages) was fixed; this removed false negative `ModuleNotFoundError: No module named 'cinderx'` probe failures in strict publishable runs.
+- Local publishable comparisons still require a real local CinderX-enabled runtime (`--cpython-cinderx` or `CINDERX_PYTHON`).
 
 Re-validation snapshot (2026-02-19):
 
@@ -146,3 +152,5 @@ Re-validation snapshot (2026-02-19):
 - `make bench-pyperformance-local` ✅ (run id `20260219T184031Z`)
 - `make bench-dossier` ✅
 - `make bench-publish-check` ❌ expected (fails by design until a real CinderX baseline runtime is executed with `--require-cinderx-baseline`)
+- GitHub Actions run `22196870445` ✅ (smoke-only dispatch; fallback CI-shape + pinned publishable both green)
+- GitHub Actions run `22196955889` ✅ (smoke + pyperformance dispatch; fallback CI-shape + pinned publishable both green)
