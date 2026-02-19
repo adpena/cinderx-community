@@ -138,6 +138,7 @@ Validation caveat:
 - As of 2026-02-19 in this workspace, no real CinderX-enabled interpreter is available on-path.
 - Publishable CinderX-vs-runtime comparisons require a real CinderX runtime binary for `--cpython-cinderx` (or `CINDERX_PYTHON` in CI), and strict validation now enforces this.
 - `uv`-managed install attempts on 2026-02-19 (`uv pip install --python .venv/bin/python --no-build-isolation cinderx`, including Python 3.14.3 arm64) fail in upstream CinderX native build with `fmt` compile errors (`use of undeclared identifier 'malloc'/'free'`), so this workspace remains in non-publishable CI-shape mode only.
+- GitHub-hosted benchmark run `22196352820` (2026-02-19) successfully completed in CI-shape fallback mode; hosted `uv pip install cinderx` succeeded but direct `import cinderx` probe crashed (exit 139), so workflow intentionally avoided publishable CinderX-baselined mode.
 
 Re-validation snapshot (2026-02-19):
 

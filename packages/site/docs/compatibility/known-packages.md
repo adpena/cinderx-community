@@ -14,12 +14,13 @@ Legend:
 
 ## Registry
 
-| Package         | Status               | Runtime                 | Evidence                                             | Notes                                                                          |
-| --------------- | -------------------- | ----------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `cinderx`       | known-issue          | macOS arm64 local build | Local install attempts on 2026-02-19                 | Upstream `fmt` compile error (`malloc` / `free` undeclared) in this workspace. |
-| `pyperformance` | green                | CPython 3.14            | Local Phase 3 harness runs                           | Runnable adapter and normalized ingestion are active.                          |
-| `nuitka`        | green (adapter path) | CPython toolchain       | Local smoke adapter execution path                   | Compare against CinderX baseline when runtime is available.                    |
-| `pypy`          | unknown              | N/A                     | No validated CinderX-baselined run in this workspace | Optional comparator path exists.                                               |
+| Package         | Status               | Runtime                       | Evidence                                             | Notes                                                                          |
+| --------------- | -------------------- | ----------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `cinderx`       | known-issue          | macOS arm64 local build       | Local install attempts on 2026-02-19                 | Upstream `fmt` compile error (`malloc` / `free` undeclared) in this workspace. |
+| `cinderx`       | known-issue          | GitHub `ubuntu-latest` runner | Actions run `22196352820`                            | Install succeeded, but direct import probe crashed (exit 139).                 |
+| `pyperformance` | green                | CPython 3.14                  | Local Phase 3 harness runs                           | Runnable adapter and normalized ingestion are active.                          |
+| `nuitka`        | green (adapter path) | CPython toolchain             | Local smoke adapter execution path                   | Compare against CinderX baseline when runtime is available.                    |
+| `pypy`          | unknown              | N/A                           | No validated CinderX-baselined run in this workspace | Optional comparator path exists.                                               |
 
 ## Contribution format
 

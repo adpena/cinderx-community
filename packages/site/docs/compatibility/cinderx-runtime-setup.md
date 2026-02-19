@@ -59,6 +59,12 @@ inside bundled `fmt` during C++ compilation (`malloc` / `free` undeclared), even
 prerequisites are installed. Until that upstream issue is resolved or a compatible wheel is used,
 publishable CinderX-baselined benchmark runs are blocked by design.
 
+## Hosted-runner caveat (GitHub Actions)
+
+As of 2026-02-19 in workflow run `22196352820`, `uv pip install cinderx` on `ubuntu-latest` did
+install, but direct `import cinderx` probe crashed (exit 139). The benchmark workflow therefore
+falls back automatically to CI-shape mode instead of publishing CinderX-baselined comparisons.
+
 ## Publishability guardrail
 
 `cxc bench verify-publish` requires:
