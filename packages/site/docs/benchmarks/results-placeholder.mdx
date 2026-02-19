@@ -16,10 +16,13 @@ This page renders benchmark summaries published under `data/summary/*.json` and 
 - Commit SHAs and machine metadata included in every run
 - Speedup values are always relative to the baseline runtime in the same run
 - CinderX-first policy is enforceable via `--require-cinderx-baseline` for comparison runs
-- Includes a dedicated `Compare vs CinderX` preset with a per-benchmark delta table
+- Canonical publishable CI artifacts are produced by the pinned CinderX lane only (`ubuntu-22.04` + pinned CPython)
+- The `ubuntu-latest` lane is diagnostics-only (`ci-shape`) and is not used as a headline publish source
+- Includes a dedicated CinderX-first headline preset (`CinderX Headline View`) with a per-benchmark delta table
 - Includes per-benchmark statistical fields (`p_value`, optional RSS, optional compile time) in dashboard tables
-- The `Compare vs CinderX` preset is only active for summaries that actually include a CinderX baseline runtime
+- The CinderX headline preset is only active for summaries that actually include a CinderX baseline runtime
 - Runtime speedup charts are intentionally hidden for non-CinderX-baselined summaries to avoid CPython-framed headline comparisons
+- Publishable summary history is persisted to the `bench-results` branch for trend ingestion (`history/index.json`)
 
 <BenchSummaryDashboard />
 

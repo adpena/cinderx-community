@@ -121,11 +121,12 @@ benchmark workflow wiring.
   - Metadata dossier export command: `cxc bench export-dossier` emits report-ready configuration snapshots from latest summaries
 - Deliverable 6 (continuous strategy): implemented
   - Workflow: `.github/workflows/benchmarks.yml` (manual + scheduled benchmark runs with a dual-job strategy:
-    - `benchmark` on `ubuntu-latest` keeps CI-shape validation and gracefully falls back when hosted CinderX probe crashes/fails
-    - `benchmark_pinned_publishable` on pinned `ubuntu-22.04` + pinned CPython `3.14.0` (via `actions/setup-python`) runs strict CinderX-baselined publishable comparisons and uploads publishable artifacts)
+    - `benchmark` on `ubuntu-latest` is diagnostics-only CI-shape validation and gracefully falls back when hosted CinderX probe crashes/fails
+    - `benchmark_pinned_publishable` on pinned `ubuntu-22.04` + pinned CPython `3.14.0` (via `actions/setup-python`) is the canonical publishable lane for strict CinderX-baselined comparisons and uploads publishable artifacts)
   - `CINDERX_PYTHON` override is supported for external CinderX runtimes
   - CinderX-enabled runs execute `cxc bench verify-publish` before uploading publishable artifacts
-  - non-CinderX runs are explicitly uploaded as `ci-shape` artifacts only
+  - diagnostics lane uploads are explicitly non-publishable `ci-shape` artifacts only
+  - publishable summary history is persisted by CI to the `bench-results` branch (`history/index.json`, `history/latest/`, per-run snapshots under `history/runs/...`)
   - metadata dossiers are exported automatically
   - Local-free execution path is wired through make targets: `make bench-smoke-local`, `make bench-pyperformance-local`, `make bench-smoke-local-cinderx`, `make bench-pyperformance-local-cinderx`
   - Project metadata includes optional `cinderx` dependency managed via `uv` (`uv add --project ./python --optional cinderx cinderx --no-sync`)

@@ -13,6 +13,26 @@
   padding: 0.8rem;
 }
 
+.claimStrong {
+  border: 1px solid rgba(15, 107, 63, 0.25);
+  border-radius: 10px;
+  background: #eefaf4;
+  color: #155735;
+  padding: 0.8rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.claimWarning {
+  border: 1px solid rgba(138, 61, 0, 0.22);
+  border-radius: 10px;
+  background: #fff6ee;
+  color: #7a3500;
+  padding: 0.8rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
 .presets {
   display: flex;
   gap: 0.5rem;

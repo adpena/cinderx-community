@@ -43,6 +43,13 @@ type SmokeSummary = {
   runtimes: RuntimeSummary[];
   skipped_runtimes: string[];
   benchmarks: BenchmarkRow[];
+  metadata?: {
+    run_config?: {
+      ci_mode?: boolean;
+      require_cinderx_baseline?: boolean;
+    };
+  };
+  limitations?: string[] | null;
 };
 
 type SummaryIndex = {
@@ -102,7 +109,7 @@ export default function BenchSummaryDashboard() {
   const [selectedRuntime, setSelectedRuntime] = useState<string>('');
   const [comparisonRuntime, setComparisonRuntime] = useState<string>('');
   const [selectedWorkload, setSelectedWorkload] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('runtime');
+  const [viewMode, setViewMode] = useState<ViewMode>('vs-cinderx');
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
@@ -165,6 +172,7 @@ export default function BenchSummaryDashboard() {
         const defaultComparisonRuntime = chooseComparisonRuntime(payload.runtimes);
         setComparisonRuntime(defaultComparisonRuntime);
         setSelectedWorkload('all');
+
         const hasCinderxComparison =
           payload.baseline_runtime === 'cpython-cinderx' &&
           payload.runtimes.some((item) => item.executed && item.runtime !== 'cpython-cinderx') &&
@@ -191,10 +199,15 @@ export default function BenchSummaryDashboard() {
   }, [summary]);
 
   const cinderxBaseline = useMemo(() => {
-    if (!summary) {
-      return false;
-    }
-    return summary.baseline_runtime === 'cpython-cinderx';
+    return summary?.baseline_runtime === 'cpython-cinderx';
+  }, [summary]);
+
+  const ciShapeRun = useMemo(() => {
+    return Boolean(summary?.metadata?.run_config?.ci_mode);
+  }, [summary]);
+
+  const cinderxPolicyEnforced = useMemo(() => {
+    return Boolean(summary?.metadata?.run_config?.require_cinderx_baseline);
   }, [summary]);
 
   const workloadOptions = useMemo(() => {
@@ -293,14 +306,19 @@ export default function BenchSummaryDashboard() {
 
   return (
     <section className={styles.wrapper}>
+      {cinderxBaseline && cinderxPolicyEnforced ? (
+        <p className={styles.claimStrong}>
+          Canonical CinderX-first summary: headline comparisons are anchored to the CinderX
+          baseline.
+        </p>
+      ) : (
+        <p className={styles.claimWarning}>
+          Diagnostics-only summary (non-claim): this result is not fully CinderX-baselined and
+          policy-enforced for headline comparisons.
+        </p>
+      )}
+
       <div className={styles.presets}>
-        <button
-          type="button"
-          className={`${styles.presetButton} ${viewMode === 'runtime' ? styles.presetActive : ''}`}
-          onClick={() => setViewMode('runtime')}
-        >
-          Runtime View
-        </button>
         <button
           type="button"
           className={`${styles.presetButton} ${viewMode === 'vs-cinderx' ? styles.presetActive : ''}`}
@@ -314,7 +332,14 @@ export default function BenchSummaryDashboard() {
               : 'CinderX baseline plus at least one additional runtime is required'
           }
         >
-          Compare vs CinderX
+          CinderX Headline View
+        </button>
+        <button
+          type="button"
+          className={`${styles.presetButton} ${viewMode === 'runtime' ? styles.presetActive : ''}`}
+          onClick={() => setViewMode('runtime')}
+        >
+          Secondary Runtime View
         </button>
       </div>
 
@@ -330,22 +355,24 @@ export default function BenchSummaryDashboard() {
           </select>
         </label>
 
-        <label>
-          Runtime
-          <select
-            value={selectedRuntime}
-            onChange={(event) => {
-              setSelectedRuntime(event.target.value);
-              setViewMode('runtime');
-            }}
-          >
-            {executedRuntimes.map((runtime) => (
-              <option key={runtime.runtime} value={runtime.runtime}>
-                {runtime.runtime_label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {viewMode === 'runtime' ? (
+          <label>
+            Runtime
+            <select
+              value={selectedRuntime}
+              onChange={(event) => {
+                setSelectedRuntime(event.target.value);
+                setViewMode('runtime');
+              }}
+            >
+              {executedRuntimes.map((runtime) => (
+                <option key={runtime.runtime} value={runtime.runtime}>
+                  {runtime.runtime_label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <label>
           Workload Class
@@ -405,10 +432,16 @@ export default function BenchSummaryDashboard() {
           CinderX comparisons.
         </p>
       ) : null}
+      {ciShapeRun ? (
+        <p className={styles.notice}>
+          CI-shape mode is enabled for this run. Treat this as reproducibility diagnostics, not a
+          headline performance claim.
+        </p>
+      ) : null}
 
       {viewMode === 'runtime' && cinderxBaseline ? (
         <>
-          <h3>Runtime speedup chart (vs baseline)</h3>
+          <h3>Secondary runtime chart (non-headline)</h3>
           <div className={styles.chart}>
             {filteredRows.map((row) => {
               const ratio = row.speedup_vs_baseline ?? 0;
@@ -425,7 +458,7 @@ export default function BenchSummaryDashboard() {
             })}
           </div>
 
-          <h3>Benchmark statistics</h3>
+          <h3>Secondary runtime statistics</h3>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -433,7 +466,7 @@ export default function BenchSummaryDashboard() {
                 <th>Workload</th>
                 <th>Mean (s)</th>
                 <th>Stdev (s)</th>
-                <th>Speedup vs baseline</th>
+                <th>Speedup vs selected baseline</th>
                 <th>p-value</th>
                 <th>RSS (max)</th>
                 <th>Compile time (s)</th>

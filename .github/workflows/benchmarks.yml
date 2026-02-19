@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   benchmark:
-    name: Smoke + Optional PyPerformance (CI-shape fallback)
+    name: Smoke + Optional PyPerformance (Diagnostics only)
     runs-on: ubuntu-latest
 
     steps:
@@ -117,7 +117,7 @@ jobs:
           elif [[ "${{ steps.cinderx_install.outputs.installed }}" == "true" ]]; then
             cinderx_bin="$python_bin"
             has_cinderx="true"
-            echo "::notice::Using hosted runner .venv Python with CinderX for publishable comparisons."
+            echo "::notice::Hosted runner .venv Python appears CinderX-capable."
           else
             echo "::warning::No usable CinderX runtime found. Running CI-shape validation without CinderX comparison publication args."
           fi
@@ -125,20 +125,15 @@ jobs:
           echo "cinderx_bin=$cinderx_bin" >> "$GITHUB_OUTPUT"
           echo "has_cinderx=$has_cinderx" >> "$GITHUB_OUTPUT"
 
+      - name: Diagnostics lane policy note
+        run: |
+          echo "::notice::This ubuntu-latest lane is diagnostics-only and never produces canonical publishable benchmark artifacts."
+
       - name: Run smoke suite
         run: |
-          extra_args=()
-          if [[ "${{ steps.runtimes.outputs.has_cinderx }}" == "true" ]]; then
-            extra_args+=(
-              --cpython-cinderx "${{ steps.runtimes.outputs.cinderx_bin }}"
-              --nuitka ".venv/bin/nuitka"
-              --require-cinderx-baseline
-            )
-          fi
           .venv/bin/cxc bench run \
             --suite smoke \
             --python "${{ steps.runtimes.outputs.python_bin }}" \
-            "${extra_args[@]}" \
             --ci-mode \
             --out data/runs \
             --summary-out data/summary \
@@ -147,36 +142,13 @@ jobs:
       - name: Run pyperformance suite
         if: ${{ github.event_name == 'schedule' || inputs.run_pyperformance == true }}
         run: |
-          extra_args=()
-          if [[ "${{ steps.runtimes.outputs.has_cinderx }}" == "true" ]]; then
-            extra_args+=(
-              --cpython-cinderx "${{ steps.runtimes.outputs.cinderx_bin }}"
-              --require-cinderx-baseline
-            )
-          fi
           .venv/bin/cxc bench run \
             --suite pyperformance \
             --python "${{ steps.runtimes.outputs.python_bin }}" \
-            "${extra_args[@]}" \
             --ci-mode \
             --out data/runs \
             --summary-out data/summary \
             --static-summary-out packages/site/static/data/summary
-
-      - name: Verify publish guard (smoke only)
-        if: ${{ steps.runtimes.outputs.has_cinderx == 'true' && !(github.event_name == 'schedule' || inputs.run_pyperformance == true) }}
-        run: |
-          .venv/bin/cxc bench verify-publish \
-            --summary-root data/summary \
-            --static-summary-root packages/site/static/data/summary \
-            --require-suite smoke
-
-      - name: Verify publish guard (smoke + pyperformance)
-        if: ${{ steps.runtimes.outputs.has_cinderx == 'true' && (github.event_name == 'schedule' || inputs.run_pyperformance == true) }}
-        run: |
-          .venv/bin/cxc bench verify-publish \
-            --summary-root data/summary \
-            --static-summary-root packages/site/static/data/summary
 
       - name: Export metadata dossier (smoke only)
         if: ${{ !(github.event_name == 'schedule' || inputs.run_pyperformance == true) }}
@@ -193,20 +165,10 @@ jobs:
             --summary-root data/summary \
             --output-root data/summary/reports
 
-      - name: Upload non-publishable CI-shape artifacts
-        if: ${{ steps.runtimes.outputs.has_cinderx != 'true' }}
+      - name: Upload diagnostics CI-shape artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-artifacts-ci-shape
-          path: |
-            data/runs
-            data/summary
-
-      - name: Upload publishable benchmark artifacts
-        if: ${{ steps.runtimes.outputs.has_cinderx == 'true' && success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-artifacts-publishable
+          name: benchmark-artifacts-ci-shape-diagnostics
           path: |
             data/runs
             data/summary
@@ -352,3 +314,125 @@ jobs:
           path: |
             data/runs
             data/summary
+
+  persist_publishable_history:
+    name: Persist publishable history (bench-results branch)
+    needs: benchmark_pinned_publishable
+    if: ${{ needs.benchmark_pinned_publishable.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download pinned publishable artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-artifacts-publishable-pinned
+          path: .cache/publishable-artifact
+
+      - name: Persist summaries to bench-results branch
+        env:
+          HISTORY_BRANCH: bench-results
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          summary_root=""
+          if [[ -d ".cache/publishable-artifact/summary" ]]; then
+            summary_root=".cache/publishable-artifact/summary"
+          elif [[ -d ".cache/publishable-artifact/data/summary" ]]; then
+            summary_root=".cache/publishable-artifact/data/summary"
+          fi
+
+          if [[ -z "$summary_root" ]]; then
+            echo "::error::Could not locate summary directory in downloaded publishable artifact."
+            find .cache/publishable-artifact -maxdepth 4 -type d || true
+            exit 1
+          fi
+
+          recorded_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          run_slug="$(date -u +%Y%m%dT%H%M%SZ)-run${GITHUB_RUN_ID}"
+          dest_summary_dir="history/runs/${run_slug}/summary"
+          latest_dir="history/latest"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin "${HISTORY_BRANCH}" >/dev/null 2>&1; then
+            git fetch origin "${HISTORY_BRANCH}:${HISTORY_BRANCH}"
+            git checkout "${HISTORY_BRANCH}"
+          else
+            git checkout --orphan "${HISTORY_BRANCH}"
+            git rm -rf . || true
+          fi
+
+          mkdir -p "${dest_summary_dir}"
+          cp -R "${summary_root}/." "${dest_summary_dir}/"
+
+          rm -rf "${latest_dir}"
+          mkdir -p "${latest_dir}"
+          cp -R "${summary_root}/." "${latest_dir}/"
+
+          manifest="history/index.json"
+          if [[ ! -f "${manifest}" ]]; then
+            cat > "${manifest}" <<'JSON'
+          {
+            "updated_at_utc": "",
+            "entries": []
+          }
+          JSON
+          fi
+
+          tmp_manifest="$(mktemp)"
+          jq \
+            --arg updated_at "${recorded_at}" \
+            --arg recorded_at "${recorded_at}" \
+            --arg run_id "${GITHUB_RUN_ID}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg ref "${GITHUB_REF_NAME}" \
+            --arg suite_smoke "history/latest/latest-smoke.json" \
+            --arg suite_pyperf "history/latest/latest-pyperformance.json" \
+            --arg run_summary_dir "${dest_summary_dir}" \
+            '
+            .updated_at_utc = $updated_at
+            | .entries = (
+                [
+                  {
+                    recorded_at_utc: $recorded_at,
+                    run_id: $run_id,
+                    sha: $sha,
+                    ref: $ref,
+                    run_summary_dir: $run_summary_dir,
+                    latest_smoke_path: $suite_smoke,
+                    latest_pyperformance_path: $suite_pyperf
+                  }
+                ] + (.entries // [])
+              )[:250]
+            ' \
+            "${manifest}" > "${tmp_manifest}"
+          mv "${tmp_manifest}" "${manifest}"
+
+          cat > history/README.md <<'MD'
+          # Bench Results Branch
+
+          This branch stores publishable benchmark summary history generated by
+          `.github/workflows/benchmarks.yml` pinned CinderX-baselined runs.
+
+          - `history/latest/`: latest publishable summary snapshots
+          - `history/runs/<timestamp>-run<id>/summary/`: immutable per-run snapshots
+          - `history/index.json`: compact manifest for trend ingestion
+          MD
+
+          git add history
+          if git diff --cached --quiet; then
+            echo "No history changes to commit."
+            exit 0
+          fi
+
+          git commit -m "bench: persist publishable summaries for run ${GITHUB_RUN_ID}"
+          git push origin "${HISTORY_BRANCH}"
