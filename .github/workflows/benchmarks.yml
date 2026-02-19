@@ -129,6 +129,11 @@ jobs:
         run: |
           echo "::notice::This ubuntu-latest lane is diagnostics-only and never produces canonical publishable benchmark artifacts."
 
+      - name: Prepare clean output directories
+        run: |
+          rm -rf data/runs data/summary packages/site/static/data/summary
+          mkdir -p data/runs data/summary packages/site/static/data/summary
+
       - name: Run smoke suite
         run: |
           .venv/bin/cxc bench run \
@@ -249,6 +254,11 @@ jobs:
           )"
           echo "python_bin=$python_bin" >> "$GITHUB_OUTPUT"
           echo "cinderx_bin=$python_bin" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare clean output directories
+        run: |
+          rm -rf data/runs data/summary packages/site/static/data/summary
+          mkdir -p data/runs data/summary packages/site/static/data/summary
 
       - name: Run smoke suite (publishable)
         run: |
