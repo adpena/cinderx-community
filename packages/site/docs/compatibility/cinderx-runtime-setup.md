@@ -65,6 +65,17 @@ make bench-smoke-local-cinderx
 make bench-pyperformance-local-cinderx
 ```
 
+## Verify JIT and static-loader surfaces before benchmarking
+
+```bash
+.venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --install-static-loader
+```
+
+These checks validate that CinderX APIs used by this repo's bootstrap profiles are available in
+your local runtime.
+
 ## Known local caveat in this workspace
 
 As of 2026-02-19 on macOS arm64 in this workspace, default local source-build path can fail inside
@@ -77,6 +88,9 @@ Additional validation notes from this workspace:
 - default `uv pip install cinderx` failed with the same `fmt` error
 - default `python -m pip install cinderx` failed with the same `fmt` error
 - `PYTHONPATH=src` did not change the failure mode
+- separate local failure mode observed on 2026-02-20: `import cinderx` succeeded but
+  `get_import_error()` reported `_cinderx.so` missing symbol `__ZNSt3__113__hash_memoryEPKvm`;
+  in that state JIT/runtime hooks were unavailable (`scripts/tutorials/runtime_identity_report.py`)
 
 ## Hosted-runner caveat (GitHub Actions)
 
@@ -101,3 +115,13 @@ reintroduce regressions.
 - executed CinderX runtime rows exist
 
 If those are not present, publication is rejected to prevent CPython-framed headline comparisons.
+
+Pyperformance with `--cpython-cinderx` auto-applies profile `cinderx-all-features` on the
+`cpython-cinderx` lane (plain `cpython` remains control). For explicit profile overrides:
+
+```bash
+CINDERX_PYTHON=/path/to/cinderx-python \
+PYPERF_BOOTSTRAP_PROFILE=cinderx-jit-compile-after-n-calls \
+PYPERF_BOOTSTRAP_JIT_COMPILE_AFTER_N_CALLS=40000 \
+bash scripts/bench/run_quickstart_matrix.sh
+```

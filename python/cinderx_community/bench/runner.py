@@ -31,6 +31,17 @@ SUPPORTED_SUITES = [
     *PLANNED_ONLY_SUITES,
 ]
 PUBLISHABLE_SUITES = [SMOKE_SUITE, PYPERFORMANCE_SUITE]
+PYPERFORMANCE_BOOTSTRAP_PROFILES = [
+    "cinderx-init",
+    "cinderx-all-features",
+    "cinderx-jit-auto",
+    "cinderx-jit-compile-after-n-calls",
+    "cinderx-jit-disable",
+    "cinderx-static-loader",
+    "cinderx-static-loader-patching",
+]
+DEFAULT_PYPERFORMANCE_JIT_COMPILE_AFTER_N_CALLS = 40000
+AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE = "cinderx-all-features"
 
 WORKLOAD_TAXONOMY = [
     {
@@ -405,18 +416,49 @@ def _runtime_cinderx_probe(executable: str) -> tuple[bool, str]:
     script = textwrap.dedent(
         """
         import json
+        import importlib
         import platform
         import sys
 
         payload = {
             "has_module": False,
             "branded": False,
+            "is_initialized": False,
+            "has_jit_module": False,
+            "jit_entrypoints": [],
+            "has_static_loader_install": False,
             "error": None,
             "result": False,
         }
         try:
-            import cinderx  # noqa: F401
+            import cinderx
             payload["has_module"] = True
+            payload["is_initialized"] = bool(getattr(cinderx, "is_initialized", lambda: False)())
+
+            try:
+                jit_module = importlib.import_module("cinderx.jit")
+            except BaseException:
+                jit_module = None
+            if jit_module is not None:
+                payload["has_jit_module"] = True
+                jit_candidates = [
+                    "auto",
+                    "compile_after_n_calls",
+                    "disable",
+                    "enable",
+                    "is_enabled",
+                ]
+                payload["jit_entrypoints"] = [
+                    name for name in jit_candidates if hasattr(jit_module, name)
+                ]
+
+            try:
+                strict_loader = importlib.import_module("cinderx.compiler.strict.loader")
+            except BaseException:
+                strict_loader = None
+            payload["has_static_loader_install"] = bool(
+                strict_loader is not None and hasattr(strict_loader, "install")
+            )
         except BaseException as exc:
             payload["error"] = f"{type(exc).__name__}: {exc}"
 
@@ -462,10 +504,29 @@ def _runtime_cinderx_probe(executable: str) -> tuple[bool, str]:
             result = bool(payload.get("result"))
             has_module = bool(payload.get("has_module"))
             branded = bool(payload.get("branded"))
+            is_initialized = bool(payload.get("is_initialized"))
+            has_jit_module = bool(payload.get("has_jit_module"))
+            has_static_loader_install = bool(payload.get("has_static_loader_install"))
+            jit_entrypoints = payload.get("jit_entrypoints")
+            if isinstance(jit_entrypoints, list):
+                jit_entrypoints_text = ",".join(str(item) for item in jit_entrypoints)
+            else:
+                jit_entrypoints_text = ""
             error = str(payload.get("error") or "")
             return (
                 result,
-                f"result={result} has_module={has_module} branded={branded} error={error!r}",
+                " ".join(
+                    [
+                        f"result={result}",
+                        f"has_module={has_module}",
+                        f"branded={branded}",
+                        f"is_initialized={is_initialized}",
+                        f"has_jit_module={has_jit_module}",
+                        f"jit_entrypoints={jit_entrypoints_text or 'none'}",
+                        f"has_static_loader_install={has_static_loader_install}",
+                        f"error={error!r}",
+                    ]
+                ),
             )
 
     truncated_stdout = "\n".join(stdout.splitlines()[-5:])
@@ -848,12 +909,225 @@ def _version_line(executable: Path) -> str:
     return "unknown"
 
 
+def _render_pyperformance_bootstrap_profile(
+    *, profile: str, jit_compile_after_n_calls: int | None
+) -> tuple[str, int | None]:
+    if profile not in PYPERFORMANCE_BOOTSTRAP_PROFILES:
+        raise ValueError(
+            "Unsupported pyperformance bootstrap profile: "
+            f"{profile!r}. Supported values: {', '.join(PYPERFORMANCE_BOOTSTRAP_PROFILES)}"
+        )
+
+    if profile == "cinderx-jit-compile-after-n-calls":
+        if jit_compile_after_n_calls is None:
+            jit_compile_after_n_calls = DEFAULT_PYPERFORMANCE_JIT_COMPILE_AFTER_N_CALLS
+        if jit_compile_after_n_calls <= 0:
+            raise ValueError(
+                "pyperformance bootstrap jit threshold must be > 0 when using "
+                "'cinderx-jit-compile-after-n-calls'."
+            )
+    elif jit_compile_after_n_calls is not None:
+        raise ValueError(
+            "--pyperformance-bootstrap-jit-compile-after-n-calls is only valid with "
+            "--pyperformance-bootstrap-profile=cinderx-jit-compile-after-n-calls."
+        )
+
+    common_prefix = textwrap.dedent(
+        """
+        import importlib.util
+        if importlib.util.find_spec("cinderx") is not None:
+            import cinderx
+            if hasattr(cinderx, "init"):
+                cinderx.init()
+        """
+    ).strip()
+
+    if profile == "cinderx-init":
+        return common_prefix, None
+
+    if profile == "cinderx-all-features":
+        return (
+            textwrap.dedent(
+                """
+                import importlib
+                import importlib.util
+                if importlib.util.find_spec("cinderx") is not None:
+                    import cinderx
+                    if hasattr(cinderx, "init"):
+                        cinderx.init()
+                    try:
+                        import cinderx.jit as cinderx_jit
+                    except Exception:
+                        cinderx_jit = None
+                    if cinderx_jit is not None and hasattr(cinderx_jit, "auto"):
+                        cinderx_jit.auto()
+                    try:
+                        strict_loader = importlib.import_module("cinderx.compiler.strict.loader")
+                    except Exception:
+                        strict_loader = None
+                    if strict_loader is not None and hasattr(strict_loader, "install"):
+                        strict_loader.install(enable_patching=True)
+                """
+            ).strip(),
+            None,
+        )
+
+    if profile == "cinderx-jit-auto":
+        return (
+            textwrap.dedent(
+                """
+                import importlib.util
+                if importlib.util.find_spec("cinderx") is not None:
+                    import cinderx
+                    if hasattr(cinderx, "init"):
+                        cinderx.init()
+                    try:
+                        import cinderx.jit as cinderx_jit
+                    except Exception:
+                        cinderx_jit = None
+                    if cinderx_jit is not None and hasattr(cinderx_jit, "auto"):
+                        cinderx_jit.auto()
+                """
+            ).strip(),
+            None,
+        )
+
+    if profile == "cinderx-jit-compile-after-n-calls":
+        threshold = int(
+            jit_compile_after_n_calls or DEFAULT_PYPERFORMANCE_JIT_COMPILE_AFTER_N_CALLS
+        )
+        return (
+            textwrap.dedent(
+                f"""
+                import importlib.util
+                if importlib.util.find_spec("cinderx") is not None:
+                    import cinderx
+                    if hasattr(cinderx, "init"):
+                        cinderx.init()
+                    try:
+                        import cinderx.jit as cinderx_jit
+                    except Exception:
+                        cinderx_jit = None
+                    if cinderx_jit is not None and hasattr(cinderx_jit, "compile_after_n_calls"):
+                        cinderx_jit.compile_after_n_calls({threshold})
+                """
+            ).strip(),
+            threshold,
+        )
+
+    if profile == "cinderx-jit-disable":
+        return (
+            textwrap.dedent(
+                """
+                import importlib.util
+                if importlib.util.find_spec("cinderx") is not None:
+                    import cinderx
+                    if hasattr(cinderx, "init"):
+                        cinderx.init()
+                    try:
+                        import cinderx.jit as cinderx_jit
+                    except Exception:
+                        cinderx_jit = None
+                    if cinderx_jit is not None and hasattr(cinderx_jit, "disable"):
+                        cinderx_jit.disable()
+                    if hasattr(cinderx, "remove_frame_evaluator"):
+                        cinderx.remove_frame_evaluator()
+                """
+            ).strip(),
+            None,
+        )
+
+    if profile == "cinderx-static-loader":
+        return (
+            textwrap.dedent(
+                """
+                import importlib
+                import importlib.util
+                if importlib.util.find_spec("cinderx") is not None:
+                    import cinderx
+                    if hasattr(cinderx, "init"):
+                        cinderx.init()
+                    try:
+                        strict_loader = importlib.import_module("cinderx.compiler.strict.loader")
+                    except Exception:
+                        strict_loader = None
+                    if strict_loader is not None and hasattr(strict_loader, "install"):
+                        strict_loader.install()
+                """
+            ).strip(),
+            None,
+        )
+
+    if profile == "cinderx-static-loader-patching":
+        return (
+            textwrap.dedent(
+                """
+                import importlib
+                import importlib.util
+                if importlib.util.find_spec("cinderx") is not None:
+                    import cinderx
+                    if hasattr(cinderx, "init"):
+                        cinderx.init()
+                    try:
+                        strict_loader = importlib.import_module("cinderx.compiler.strict.loader")
+                    except Exception:
+                        strict_loader = None
+                    if strict_loader is not None and hasattr(strict_loader, "install"):
+                        strict_loader.install(enable_patching=True)
+                """
+            ).strip(),
+            None,
+        )
+
+    raise ValueError(f"Unhandled pyperformance bootstrap profile: {profile!r}")
+
+
+def _resolve_pyperformance_bootstrap_inline(
+    *,
+    inline_code: str | None,
+    profile: str | None,
+    jit_compile_after_n_calls: int | None,
+) -> tuple[str | None, str | None, int | None, str]:
+    bootstrap_inline = (inline_code or "").strip()
+    bootstrap_profile = (profile or "").strip()
+
+    if bootstrap_inline and bootstrap_profile:
+        raise ValueError(
+            "Choose either --pyperformance-bootstrap-inline or "
+            "--pyperformance-bootstrap-profile, not both."
+        )
+
+    if bootstrap_profile:
+        rendered, resolved_threshold = _render_pyperformance_bootstrap_profile(
+            profile=bootstrap_profile,
+            jit_compile_after_n_calls=jit_compile_after_n_calls,
+        )
+        return rendered, bootstrap_profile, resolved_threshold, "profile"
+
+    if jit_compile_after_n_calls is not None:
+        raise ValueError(
+            "--pyperformance-bootstrap-jit-compile-after-n-calls requires "
+            "--pyperformance-bootstrap-profile=cinderx-jit-compile-after-n-calls."
+        )
+
+    if not bootstrap_inline:
+        return None, None, None, "disabled"
+
+    return bootstrap_inline, None, None, "inline"
+
+
 def _prepare_pyperformance_bootstrap(
     inline_code: str | None,
-) -> tuple[dict[str, str], tempfile.TemporaryDirectory[str] | None, str | None]:
+    *,
+    source_mode: str,
+    target_runtime_key: str | None = "cpython-cinderx",
+) -> tuple[dict[str, str], tempfile.TemporaryDirectory[str] | None, str | None, str]:
     bootstrap = (inline_code or "").strip()
     if not bootstrap:
-        return {}, None, None
+        return {}, None, None, "disabled"
+
+    if source_mode not in {"inline", "profile"}:
+        raise ValueError(f"Unsupported pyperformance bootstrap source mode: {source_mode!r}")
 
     tempdir = tempfile.TemporaryDirectory(prefix="cxc-pyperf-bootstrap-")
     shim_root = Path(tempdir.name)
@@ -863,16 +1137,22 @@ def _prepare_pyperformance_bootstrap(
         import sys
 
         bootstrap = os.environ.get("CXC_PYPERF_BOOTSTRAP_INLINE", "").strip()
+        bootstrap_target_runtime = os.environ.get(
+            "CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY", ""
+        ).strip()
+        runtime_key = os.environ.get("CXC_PYPERF_RUNTIME_KEY", "").strip()
+        should_apply = not bootstrap_target_runtime or runtime_key == bootstrap_target_runtime
         if bootstrap:
-            namespace = {}
-            try:
-                exec(bootstrap, namespace, namespace)
-            except Exception as exc:  # pragma: no cover - surfaced in benchmark logs
-                print(
-                    f"[cxc-pyperf-bootstrap] inline bootstrap failed: {exc!r}",
-                    file=sys.stderr,
-                )
-                raise
+            if should_apply:
+                namespace = {}
+                try:
+                    exec(bootstrap, namespace, namespace)
+                except Exception as exc:  # pragma: no cover - surfaced in benchmark logs
+                    print(
+                        f"[cxc-pyperf-bootstrap] inline bootstrap failed: {exc!r}",
+                        file=sys.stderr,
+                    )
+                    raise
         """
     ).strip()
     (shim_root / "sitecustomize.py").write_text(sitecustomize, encoding="utf-8")
@@ -883,9 +1163,12 @@ def _prepare_pyperformance_bootstrap(
         f"{shim_root}{os.pathsep}{current_pythonpath}" if current_pythonpath else str(shim_root)
     )
     env["CXC_PYPERF_BOOTSTRAP_INLINE"] = bootstrap
-    env["CXC_PYPERF_BOOTSTRAP_MODE"] = "sitecustomize-inline"
+    bootstrap_mode = f"sitecustomize-{source_mode}"
+    env["CXC_PYPERF_BOOTSTRAP_MODE"] = bootstrap_mode
+    if target_runtime_key:
+        env["CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY"] = target_runtime_key
     bootstrap_sha256 = hashlib.sha256(bootstrap.encode("utf-8")).hexdigest()
-    return env, tempdir, bootstrap_sha256
+    return env, tempdir, bootstrap_sha256, bootstrap_mode
 
 
 def _python_runtime_details(executable: Path) -> dict[str, str]:
@@ -1801,6 +2084,8 @@ def run_pyperformance_suite(
     pypy: Path | None = None,
     static_summary_root: Path | None = None,
     pyperformance_bootstrap_inline: str | None = None,
+    pyperformance_bootstrap_profile: str | None = None,
+    pyperformance_bootstrap_jit_compile_after_n_calls: int | None = None,
 ) -> BenchmarkRunResult:
     python_hint = Path(os.path.abspath(str(python.expanduser())))
     baseline_python = Path(os.path.abspath(str(python_hint)))
@@ -1815,11 +2100,8 @@ def run_pyperformance_suite(
     machine_slug = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in machine_name)
     startup_samples = 3 if ci_mode else 5
     pyperformance_benchmarks = ["nbody"] if ci_mode else None
-    (
-        pyperformance_bootstrap_env,
-        pyperformance_bootstrap_tempdir,
-        pyperformance_bootstrap_sha256,
-    ) = _prepare_pyperformance_bootstrap(pyperformance_bootstrap_inline)
+    configured_bootstrap_inline = (pyperformance_bootstrap_inline or "").strip()
+    configured_bootstrap_profile = (pyperformance_bootstrap_profile or "").strip()
 
     guardrails = _guardrail_checks(ci_mode)
     if enforce_guardrails and guardrails["enforceable_failures"]:
@@ -1835,6 +2117,60 @@ def run_pyperformance_suite(
         targets=targets,
         require_cinderx_baseline=require_cinderx_baseline,
     )
+    cinderx_runtime_available = any(
+        target.key == "cpython-cinderx" and target.available and target.executable is not None
+        for target in targets
+    )
+    effective_bootstrap_profile = pyperformance_bootstrap_profile
+    bootstrap_profile_source = "explicit" if configured_bootstrap_profile else None
+    if (
+        not configured_bootstrap_inline
+        and not configured_bootstrap_profile
+        and cinderx_runtime_available
+    ):
+        effective_bootstrap_profile = AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE
+        bootstrap_profile_source = "auto-default"
+    (
+        resolved_bootstrap_inline,
+        resolved_bootstrap_profile,
+        resolved_bootstrap_jit_compile_after_n_calls,
+        resolved_bootstrap_source_mode,
+    ) = _resolve_pyperformance_bootstrap_inline(
+        inline_code=pyperformance_bootstrap_inline,
+        profile=effective_bootstrap_profile,
+        jit_compile_after_n_calls=pyperformance_bootstrap_jit_compile_after_n_calls,
+    )
+    resolved_bootstrap_profile_source = "disabled"
+    if resolved_bootstrap_source_mode == "inline":
+        resolved_bootstrap_profile_source = "inline"
+    elif resolved_bootstrap_profile:
+        resolved_bootstrap_profile_source = bootstrap_profile_source or "explicit"
+    bootstrap_target_runtime_key = "cpython-cinderx" if resolved_bootstrap_inline else None
+    (
+        pyperformance_bootstrap_env,
+        pyperformance_bootstrap_tempdir,
+        pyperformance_bootstrap_sha256,
+        pyperformance_bootstrap_mode,
+    ) = _prepare_pyperformance_bootstrap(
+        resolved_bootstrap_inline,
+        source_mode=resolved_bootstrap_source_mode,
+        target_runtime_key=bootstrap_target_runtime_key,
+    )
+    if pyperformance_bootstrap_sha256 and bootstrap_target_runtime_key:
+        bootstrap_target = next(
+            (target for target in targets if target.key == bootstrap_target_runtime_key),
+            None,
+        )
+        if (
+            bootstrap_target is None
+            or not bootstrap_target.available
+            or bootstrap_target.executable is None
+        ):
+            raise ValueError(
+                "Pyperformance bootstrap is configured to apply to runtime "
+                f"{bootstrap_target_runtime_key!r}, but that runtime is not available. "
+                "Provide --cpython-cinderx /path/to/cinderx-python."
+            )
     pyperformance_command, pyperformance_version = _resolve_pyperformance_launcher(python_hint)
 
     cinderx_pin = upstream.read_pin_record("cinderx")
@@ -1860,14 +2196,18 @@ def run_pyperformance_suite(
             "require_cinderx_baseline": require_cinderx_baseline,
             "pyperformance_bootstrap_inline_enabled": bool(pyperformance_bootstrap_sha256),
             "pyperformance_bootstrap_inline_sha256": pyperformance_bootstrap_sha256,
+            "pyperformance_bootstrap_profile": resolved_bootstrap_profile,
+            "pyperformance_bootstrap_profile_source": resolved_bootstrap_profile_source,
+            "pyperformance_bootstrap_jit_compile_after_n_calls": (
+                resolved_bootstrap_jit_compile_after_n_calls
+            ),
+            "pyperformance_bootstrap_target_runtime_key": bootstrap_target_runtime_key,
         },
         "toolchain": {
             "benchmark_repo_sha": repo_sha,
             "pyperformance_command": pyperformance_command,
             "pyperformance_version": pyperformance_version,
-            "pyperformance_bootstrap_mode": (
-                "sitecustomize-inline" if pyperformance_bootstrap_sha256 else "disabled"
-            ),
+            "pyperformance_bootstrap_mode": pyperformance_bootstrap_mode,
             "cinderx_upstream": {
                 "repo_url": cinderx_pin.repo_url if cinderx_pin else "unknown",
                 "commit_sha": cinderx_pin.commit_sha if cinderx_pin else "unknown",
@@ -1935,10 +2275,12 @@ def run_pyperformance_suite(
 
         try:
             if pyperformance_bootstrap_env:
+                runtime_bootstrap_env = dict(pyperformance_bootstrap_env)
+                runtime_bootstrap_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
                 _run_command(
                     command,
                     timeout_s=1200 if ci_mode else 7200,
-                    env=pyperformance_bootstrap_env,
+                    env=runtime_bootstrap_env,
                 )
             else:
                 _run_command(command, timeout_s=1200 if ci_mode else 7200)
@@ -2147,6 +2489,24 @@ def run_pyperformance_suite(
         notes.append("CinderX baseline policy was enforced for this run.")
     if ci_mode:
         notes.append("CI mode enabled: pyperformance --fast mode ran the nbody subset.")
+    if resolved_bootstrap_profile:
+        if resolved_bootstrap_profile_source == "auto-default":
+            notes.append(
+                "Pyperformance auto-applied bootstrap profile for cpython-cinderx lane: "
+                f"{resolved_bootstrap_profile}."
+            )
+        else:
+            notes.append(
+                "Pyperformance bootstrap profile applied: "
+                f"{resolved_bootstrap_profile} (target runtime: "
+                f"{bootstrap_target_runtime_key or 'none'})."
+            )
+        notes.append("Plain cpython lane remains unmodified for control comparisons.")
+    elif pyperformance_bootstrap_sha256:
+        notes.append(
+            "Custom inline pyperformance bootstrap was applied via sitecustomize shim "
+            f"(target runtime: {bootstrap_target_runtime_key or 'all'})."
+        )
     if skipped_runtimes:
         notes.append("Some runtimes/tools were skipped; see skipped_runtimes field.")
 

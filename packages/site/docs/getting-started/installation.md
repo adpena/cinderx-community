@@ -35,6 +35,9 @@ make cinderx-install-local-macos
 ```
 
 `PYTHONPATH=src` does not resolve this build failure because it occurs in native C++ compilation.
+Separate runtime caveat: install may succeed while `_cinderx.so` fails symbol resolution at import
+time (`get_import_error()` reports missing `__ZNSt3__113__hash_memoryEPKvm`), which disables JIT
+and static-loader hooks.
 
 ## Verify import only
 
@@ -42,6 +45,17 @@ make cinderx-install-local-macos
 import cinderx
 print('cinderx import ok')
 ```
+
+## Verify runtime feature surfaces
+
+```bash
+.venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
+```
+
+For existing CPython apps, use:
+
+- [CPython project quickstart](../tutorials/cpython-project-quickstart)
 
 :::info Validation scope
 Import checks are only the first gate. Use compatibility pages plus benchmark guardrails before

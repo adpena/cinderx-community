@@ -9,6 +9,7 @@ from typing import Annotated
 import typer
 
 from cinderx_community.bench.runner import (
+    PYPERFORMANCE_BOOTSTRAP_PROFILES,
     PYPERFORMANCE_SUITE,
     SMOKE_SUITE,
     build_plan,
@@ -211,7 +212,28 @@ def bench_run(
         typer.Option(
             help=(
                 "Optional inline Python executed via a temporary sitecustomize shim for "
-                "pyperformance runs (experimental). Useful for CinderX feature bootstrap trials."
+                "pyperformance runs (experimental). Useful for custom CinderX feature trials."
+            ),
+        ),
+    ] = None,
+    pyperformance_bootstrap_profile: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Named pyperformance bootstrap profile. Supported values: "
+                + ", ".join(PYPERFORMANCE_BOOTSTRAP_PROFILES)
+                + ". When omitted and --cpython-cinderx is provided, "
+                "cinderx-all-features is auto-applied to the cpython-cinderx lane."
+            ),
+        ),
+    ] = None,
+    pyperformance_bootstrap_jit_compile_after_n_calls: Annotated[
+        int | None,
+        typer.Option(
+            min=1,
+            help=(
+                "JIT compile-after-n-calls threshold for "
+                "--pyperformance-bootstrap-profile=cinderx-jit-compile-after-n-calls."
             ),
         ),
     ] = None,
@@ -254,6 +276,10 @@ def bench_run(
                 pypy=pypy,
                 static_summary_root=static_summary_out,
                 pyperformance_bootstrap_inline=pyperformance_bootstrap_inline,
+                pyperformance_bootstrap_profile=pyperformance_bootstrap_profile,
+                pyperformance_bootstrap_jit_compile_after_n_calls=(
+                    pyperformance_bootstrap_jit_compile_after_n_calls
+                ),
             )
     except ValueError as exc:
         typer.echo(str(exc), err=True)

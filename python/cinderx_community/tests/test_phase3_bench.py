@@ -283,12 +283,19 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
     )
     monkeypatch.setattr(runner, "_version_line", lambda _executable: "Python 3.14")
 
+    observed_env_by_runtime_key: dict[str, dict[str, str]] = {}
     original_run_command = runner._run_command
 
     def fake_run_command(
-        args: list[str], *, timeout_s: int = 90
+        args: list[str],
+        *,
+        timeout_s: int = 90,
+        env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         if args and args[0] == "fake-pyperformance":
+            if env:
+                runtime_key = env.get("CXC_PYPERF_RUNTIME_KEY", "unknown")
+                observed_env_by_runtime_key[runtime_key] = dict(env)
             assert "--benchmarks" in args
             assert "nbody" in args
             runtime_arg = args[args.index("--python") + 1]
@@ -321,7 +328,7 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
             }
             output_arg.write_text(json.dumps(payload), encoding="utf-8")
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
-        return original_run_command(args, timeout_s=timeout_s)
+        return original_run_command(args, timeout_s=timeout_s, env=env)
 
     monkeypatch.setattr(runner, "_run_command", fake_run_command)
 
@@ -339,6 +346,20 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
     summary = json.loads(Path(result.summary_path).read_text(encoding="utf-8"))
     assert summary["suite"] == PYPERFORMANCE_SUITE
     assert summary["baseline_runtime"] == "cpython-cinderx"
+    run_config = summary["metadata"]["run_config"]
+    assert run_config["pyperformance_bootstrap_inline_enabled"] is True
+    assert (
+        run_config["pyperformance_bootstrap_profile"] == runner.AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE
+    )
+    assert run_config["pyperformance_bootstrap_profile_source"] == "auto-default"
+    assert run_config["pyperformance_bootstrap_target_runtime_key"] == "cpython-cinderx"
+    assert observed_env_by_runtime_key["cpython"]["CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY"] == (
+        "cpython-cinderx"
+    )
+    assert (
+        observed_env_by_runtime_key["cpython-cinderx"]["CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY"]
+        == "cpython-cinderx"
+    )
     assert summary["benchmarks"]
     assert any(row["runtime"] == "pypy" for row in summary["benchmarks"])
     assert any(
@@ -346,6 +367,249 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
     )
     assert any(row["memory_rss_bytes"] is not None for row in summary["benchmarks"])
     assert any(row["compile_time_seconds"] is not None for row in summary["benchmarks"])
+
+
+def test_resolve_pyperformance_bootstrap_profile_compile_after_defaults() -> None:
+    inline_code, profile, threshold, source_mode = runner._resolve_pyperformance_bootstrap_inline(
+        inline_code=None,
+        profile="cinderx-jit-compile-after-n-calls",
+        jit_compile_after_n_calls=None,
+    )
+    assert source_mode == "profile"
+    assert profile == "cinderx-jit-compile-after-n-calls"
+    assert threshold == runner.DEFAULT_PYPERFORMANCE_JIT_COMPILE_AFTER_N_CALLS
+    assert inline_code is not None
+    assert "compile_after_n_calls" in inline_code
+    assert str(runner.DEFAULT_PYPERFORMANCE_JIT_COMPILE_AFTER_N_CALLS) in inline_code
+
+
+def test_resolve_pyperformance_bootstrap_profile_all_features() -> None:
+    inline_code, profile, threshold, source_mode = runner._resolve_pyperformance_bootstrap_inline(
+        inline_code=None,
+        profile="cinderx-all-features",
+        jit_compile_after_n_calls=None,
+    )
+    assert source_mode == "profile"
+    assert profile == "cinderx-all-features"
+    assert threshold is None
+    assert inline_code is not None
+    assert "cinderx.jit" in inline_code
+    assert "strict_loader.install(enable_patching=True)" in inline_code
+
+
+def test_resolve_pyperformance_bootstrap_rejects_profile_inline_conflict() -> None:
+    try:
+        runner._resolve_pyperformance_bootstrap_inline(
+            inline_code="print('x')",
+            profile="cinderx-init",
+            jit_compile_after_n_calls=None,
+        )
+    except ValueError as exc:
+        assert (
+            "Choose either --pyperformance-bootstrap-inline or --pyperformance-bootstrap-profile"
+        ) in str(exc)
+    else:
+        raise AssertionError("Expected bootstrap profile/inline conflict validation error")
+
+
+def test_run_pyperformance_suite_records_bootstrap_profile_metadata(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(upstream, "PINS_FILE", tmp_path / "pins.toml")
+
+    cpython_link = tmp_path / "cpython-runtime"
+    cpython_link.symlink_to(Path(sys.executable))
+    cinderx_link = tmp_path / "cpython-cinderx-runtime"
+    cinderx_link.symlink_to(Path(sys.executable))
+
+    monkeypatch.setattr(
+        runner,
+        "_resolve_pyperformance_launcher",
+        lambda _python_hint: (["fake-pyperformance"], "v1"),
+    )
+    monkeypatch.setattr(runner, "_runtime_has_cinderx_support", lambda _executable: True)
+    monkeypatch.setattr(runner, "_measure_startup", lambda _executable, samples: [0.01] * samples)
+    monkeypatch.setattr(
+        runner,
+        "_python_runtime_details",
+        lambda _executable: {"implementation": "CPython", "version": "3.14"},
+    )
+    monkeypatch.setattr(runner, "_version_line", lambda _executable: "Python 3.14")
+
+    observed_env_by_runtime_key: dict[str, dict[str, str]] = {}
+    original_run_command = runner._run_command
+
+    def fake_run_command(
+        args: list[str],
+        *,
+        timeout_s: int = 90,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        if args and args[0] == "fake-pyperformance":
+            if env:
+                runtime_key = env.get("CXC_PYPERF_RUNTIME_KEY", "unknown")
+                observed_env_by_runtime_key[runtime_key] = dict(env)
+            runtime_arg = args[args.index("--python") + 1]
+            output_arg = Path(args[args.index("--output") + 1])
+            scale = 1.0 if "cpython-cinderx" in runtime_arg else 1.1
+            payload = {
+                "benchmarks": [
+                    {
+                        "metadata": {"name": "nbody"},
+                        "runs": [
+                            {"values": [0.30 * scale, 0.32 * scale], "warmups": [0.35 * scale]}
+                        ],
+                    }
+                ]
+            }
+            output_arg.write_text(json.dumps(payload), encoding="utf-8")
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+        return original_run_command(args, timeout_s=timeout_s, env=env)
+
+    monkeypatch.setattr(runner, "_run_command", fake_run_command)
+
+    result = runner.run_pyperformance_suite(
+        python=cpython_link,
+        cpython_cinderx=cinderx_link,
+        out_root=tmp_path / "runs",
+        summary_root=tmp_path / "summary",
+        machine="pyperformance-bootstrap-profile-test",
+        ci_mode=True,
+        require_cinderx_baseline=True,
+        pyperformance_bootstrap_profile="cinderx-jit-compile-after-n-calls",
+        pyperformance_bootstrap_jit_compile_after_n_calls=7,
+    )
+
+    summary = json.loads(Path(result.summary_path).read_text(encoding="utf-8"))
+    run_config = summary["metadata"]["run_config"]
+    assert run_config["pyperformance_bootstrap_inline_enabled"] is True
+    assert run_config["pyperformance_bootstrap_profile"] == "cinderx-jit-compile-after-n-calls"
+    assert run_config["pyperformance_bootstrap_profile_source"] == "explicit"
+    assert run_config["pyperformance_bootstrap_jit_compile_after_n_calls"] == 7
+    assert run_config["pyperformance_bootstrap_target_runtime_key"] == "cpython-cinderx"
+    assert run_config["pyperformance_bootstrap_inline_sha256"]
+    assert summary["metadata"]["toolchain"]["pyperformance_bootstrap_mode"] == (
+        "sitecustomize-profile"
+    )
+    assert observed_env_by_runtime_key["cpython"]["CXC_PYPERF_BOOTSTRAP_MODE"] == (
+        "sitecustomize-profile"
+    )
+    assert observed_env_by_runtime_key["cpython-cinderx"]["CXC_PYPERF_BOOTSTRAP_MODE"] == (
+        "sitecustomize-profile"
+    )
+    assert observed_env_by_runtime_key["cpython"]["CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY"] == (
+        "cpython-cinderx"
+    )
+    assert (
+        observed_env_by_runtime_key["cpython-cinderx"]["CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY"]
+        == "cpython-cinderx"
+    )
+    assert (
+        "compile_after_n_calls(7)"
+        in observed_env_by_runtime_key["cpython"]["CXC_PYPERF_BOOTSTRAP_INLINE"]
+    )
+
+
+def test_run_pyperformance_suite_without_cinderx_keeps_bootstrap_disabled(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(upstream, "PINS_FILE", tmp_path / "pins.toml")
+
+    cpython_link = tmp_path / "cpython-runtime"
+    cpython_link.symlink_to(Path(sys.executable))
+    pypy_missing = tmp_path / "missing-pypy-runtime"
+
+    monkeypatch.setattr(
+        runner,
+        "_resolve_pyperformance_launcher",
+        lambda _python_hint: (["fake-pyperformance"], "v1"),
+    )
+    monkeypatch.setattr(runner, "_measure_startup", lambda _executable, samples: [0.01] * samples)
+    monkeypatch.setattr(
+        runner,
+        "_python_runtime_details",
+        lambda _executable: {"implementation": "CPython", "version": "3.14"},
+    )
+    monkeypatch.setattr(runner, "_version_line", lambda _executable: "Python 3.14")
+
+    observed_env: dict[str, str] = {}
+    original_run_command = runner._run_command
+
+    def fake_run_command(
+        args: list[str],
+        *,
+        timeout_s: int = 90,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        if args and args[0] == "fake-pyperformance":
+            if env:
+                observed_env.update(env)
+            output_arg = Path(args[args.index("--output") + 1])
+            payload = {
+                "benchmarks": [
+                    {
+                        "metadata": {"name": "nbody"},
+                        "runs": [{"values": [0.30, 0.32], "warmups": [0.35]}],
+                    }
+                ]
+            }
+            output_arg.write_text(json.dumps(payload), encoding="utf-8")
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+        return original_run_command(args, timeout_s=timeout_s, env=env)
+
+    monkeypatch.setattr(runner, "_run_command", fake_run_command)
+
+    result = runner.run_pyperformance_suite(
+        python=cpython_link,
+        pypy=pypy_missing,
+        out_root=tmp_path / "runs",
+        summary_root=tmp_path / "summary",
+        machine="pyperformance-no-cinderx-auto-bootstrap",
+        ci_mode=True,
+    )
+
+    summary = json.loads(Path(result.summary_path).read_text(encoding="utf-8"))
+    run_config = summary["metadata"]["run_config"]
+    assert run_config["pyperformance_bootstrap_inline_enabled"] is False
+    assert run_config["pyperformance_bootstrap_profile"] is None
+    assert run_config["pyperformance_bootstrap_profile_source"] == "disabled"
+    assert run_config["pyperformance_bootstrap_target_runtime_key"] is None
+    assert "CXC_PYPERF_BOOTSTRAP_INLINE" not in observed_env
+
+
+def test_run_pyperformance_suite_rejects_bootstrap_without_cinderx_runtime(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(upstream, "PINS_FILE", tmp_path / "pins.toml")
+    cpython_link = tmp_path / "cpython-runtime"
+    cpython_link.symlink_to(Path(sys.executable))
+    monkeypatch.setattr(
+        runner,
+        "_resolve_pyperformance_launcher",
+        lambda _python_hint: (["fake-pyperformance"], "v1"),
+    )
+    monkeypatch.setattr(runner, "_measure_startup", lambda _executable, samples: [0.01] * samples)
+    monkeypatch.setattr(
+        runner,
+        "_python_runtime_details",
+        lambda _executable: {"implementation": "CPython", "version": "3.14"},
+    )
+    monkeypatch.setattr(runner, "_version_line", lambda _executable: "Python 3.14")
+
+    try:
+        runner.run_pyperformance_suite(
+            python=cpython_link,
+            out_root=tmp_path / "runs",
+            summary_root=tmp_path / "summary",
+            machine="pyperformance-bootstrap-missing-runtime",
+            ci_mode=True,
+            require_cinderx_baseline=False,
+            pyperformance_bootstrap_profile="cinderx-all-features",
+        )
+    except ValueError as exc:
+        assert "Provide --cpython-cinderx /path/to/cinderx-python" in str(exc)
+    else:
+        raise AssertionError("Expected bootstrap target runtime validation failure")
 
 
 def test_verify_publishable_summaries_rejects_non_cinderx_baseline(tmp_path: Path) -> None:

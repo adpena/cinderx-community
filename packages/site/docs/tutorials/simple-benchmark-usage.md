@@ -7,6 +7,11 @@ title: Simple benchmark usage (quickstart)
 This is the fastest path to run the benchmark harness with script-first commands and inspect
 artifacts that mirror published data flow.
 
+For integrating CinderX into an existing CPython application entrypoint (JIT/static-loader
+bootstrap), start with:
+
+- [CPython project quickstart](./cpython-project-quickstart)
+
 ## What this walkthrough gives you
 
 - one smoke summary JSON
@@ -53,6 +58,20 @@ For a publishable-policy run when a real CinderX runtime is available:
 
 ```bash
 CINDERX_PYTHON=/path/to/cinderx-python bash scripts/bench/run_quickstart_matrix.sh
+```
+
+Default behavior for that run:
+
+- plain `cpython` lane remains unmodified
+- `cpython-cinderx` lane auto-applies `cinderx-all-features`
+
+Optional profile override:
+
+```bash
+CINDERX_PYTHON=/path/to/cinderx-python \
+PYPERF_BOOTSTRAP_PROFILE=cinderx-jit-compile-after-n-calls \
+PYPERF_BOOTSTRAP_JIT_COMPILE_AFTER_N_CALLS=40000 \
+bash scripts/bench/run_quickstart_matrix.sh
 ```
 
 For full local pyperformance (non-`ci_mode`) on your laptop, use:
@@ -108,6 +127,13 @@ Runtime identity report:
 ```bash
 .venv/bin/python scripts/tutorials/runtime_identity_report.py
 $CINDERX_PYTHON scripts/tutorials/runtime_identity_report.py
+```
+
+Project-style bootstrap helper:
+
+```bash
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --install-static-loader
 ```
 
 Small JSON hot-path workload:

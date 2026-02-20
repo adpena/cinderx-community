@@ -46,6 +46,9 @@ Notes:
 
 - This was reproduced in this workspace on 2026-02-19 (macOS 26.3 arm64, CPython 3.14.3).
 - `PYTHONPATH=src` does not address this native build failure mode.
+- A separate runtime failure mode can still occur after install: `import cinderx` works, but
+  `get_import_error()` reports `_cinderx.so` missing symbol
+  `__ZNSt3__113__hash_memoryEPKvm`, which disables JIT/static hooks.
 
 ## Verify import
 
@@ -53,6 +56,17 @@ Notes:
 import cinderx
 print(cinderx.__file__)
 ```
+
+## Verify JIT/static surfaces
+
+```bash
+.venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
+```
+
+For existing CPython apps, continue with:
+
+- [CPython project quickstart](./tutorials/cpython-project-quickstart)
 
 :::caution Validation scope
 The command above confirms importability only. For feature-level validation (JIT/static behavior,

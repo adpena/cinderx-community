@@ -43,7 +43,12 @@ For full local pyperformance publication candidates:
 CINDERX_PYTHON=/path/to/cinderx-python make bench-pyperformance-local-cinderx
 ```
 
-Optional experimental bootstrap (feature-enablement trial):
+Default pyperformance CinderX behavior:
+
+- with `--cpython-cinderx`, the harness auto-applies profile `cinderx-all-features`
+- bootstrap targets only `cpython-cinderx`; plain `cpython` remains control lane
+
+Optional profile override:
 
 ```bash
 cxc bench run \
@@ -51,8 +56,18 @@ cxc bench run \
   --python /path/to/python3.14 \
   --cpython-cinderx /path/to/cinderx-python \
   --require-cinderx-baseline \
-  --pyperformance-bootstrap-inline "import cinderx; 'init' in dir(cinderx) and cinderx.init()"
+  --pyperformance-bootstrap-profile cinderx-jit-compile-after-n-calls \
+  --pyperformance-bootstrap-jit-compile-after-n-calls 40000
 ```
+
+Other source-backed profile options:
+
+- `cinderx-init`
+- `cinderx-all-features`
+- `cinderx-jit-compile-after-n-calls` + `--pyperformance-bootstrap-jit-compile-after-n-calls`
+- `cinderx-jit-disable`
+- `cinderx-static-loader`
+- `cinderx-static-loader-patching`
 
 Comparator support note:
 
@@ -99,13 +114,15 @@ For published claims in this repo, only use runs that are:
 - `baseline_runtime = "cpython-cinderx"`
 - `metadata.run_config.require_cinderx_baseline = true`
 - `metadata.run_config.ci_mode = false` (full pyperformance)
-- `metadata.run_config.pyperformance_bootstrap_inline_enabled = false` unless explicitly part of the claim
+- `metadata.run_config.pyperformance_bootstrap_target_runtime_key = "cpython-cinderx"`
+- `metadata.run_config.pyperformance_bootstrap_profile_source` is `auto-default` (or explicitly documented override)
 - accepted by `make bench-publish-check`
 
 Quick user-project script checks:
 
 ```bash
 .venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 .venv/bin/python scripts/tutorials/json_hot_path.py --iterations 4000 --payload-size 512
 ```
 

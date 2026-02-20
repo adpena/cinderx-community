@@ -166,6 +166,9 @@ uv pip install --python .venv/bin/python -e ./python[dev,cinderx]
 
 Note: CinderX installation is platform/toolchain dependent; on macOS arm64, default local source
 builds may fail in bundled `fmt` (`malloc` / `free` undeclared).
+Even when install succeeds, `get_import_error()` can still report `_cinderx.so` missing symbols on
+some macOS setups; verify with `scripts/tutorials/runtime_identity_report.py` before benchmark
+claims.
 
 Before trying CinderX-baselined runs, check environment readiness:
 
@@ -220,6 +223,7 @@ bash scripts/bench/install_comparison_toolchain.sh
 bash scripts/bench/run_quickstart_matrix.sh
 bash scripts/bench/sync_site_data_from_bench_results.sh
 .venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 .venv/bin/python scripts/tutorials/json_hot_path.py --iterations 4000 --payload-size 512
 ```
 
@@ -248,7 +252,7 @@ Or run the wired target directly:
 make bench-publish-check
 ```
 
-Experimental pyperformance bootstrap (feature-enablement trials):
+Pyperformance CinderX bootstrap policy:
 
 ```bash
 cd python
@@ -256,9 +260,25 @@ cd python
   --suite pyperformance \
   --python ../.venv/bin/python \
   --cpython-cinderx /path/to/cinderx-python \
-  --require-cinderx-baseline \
-  --pyperformance-bootstrap-inline "import cinderx; 'init' in dir(cinderx) and cinderx.init()"
+  --require-cinderx-baseline
 ```
+
+- With `--cpython-cinderx`, the harness auto-applies profile `cinderx-all-features` to the
+  `cpython-cinderx` lane.
+- Plain `cpython` remains the control lane (no bootstrap execution).
+- Override the default profile with `--pyperformance-bootstrap-profile <name>`, or use
+  `--pyperformance-bootstrap-inline` for custom experiments.
+
+Available profile options:
+
+- `cinderx-init`
+- `cinderx-all-features`
+- `cinderx-jit-auto`
+- `cinderx-jit-compile-after-n-calls` (plus
+  `--pyperformance-bootstrap-jit-compile-after-n-calls <N>`)
+- `cinderx-jit-disable`
+- `cinderx-static-loader`
+- `cinderx-static-loader-patching`
 
 You can run publishable benchmarks locally (no self-hosted CI required) as long as the run is
 CinderX-baselined, metadata-rich, and full pyperformance (non-`ci_mode`):

@@ -62,6 +62,8 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Tutorials',
       items: [
+        'tutorials/cpython-project-quickstart',
+        'tutorials/cinderx-runtime-scripts',
         'tutorials/simple-benchmark-usage',
         'tutorials/django-dummy-service',
         'tutorials/measure-speedups'

@@ -21,5 +21,9 @@ Source baseline for methodology: [pyperformance docs](https://pyperformance.read
 Smoke is debug-focused and not part of canonical published headline results.
 Use `--require-cinderx-baseline` for comparison publishing policy enforcement.
 Provided `--cpython-cinderx` runtimes are validated and rejected if they do not expose CinderX.
-Optional pyperformance bootstrap inline hooks are available for controlled feature-enablement experiments.
+Optional pyperformance bootstrap profiles are available for controlled feature-enablement
+experiments (`--pyperformance-bootstrap-profile ...`). When `--cpython-cinderx` is provided
+without an explicit profile, the harness auto-applies `cinderx-all-features` to the
+`cpython-cinderx` lane only; plain `cpython` remains control. Custom inline hooks are retained as
+an escape hatch.
 :::

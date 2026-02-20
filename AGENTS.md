@@ -28,6 +28,8 @@ Repo-level governance and automation live in `.github/`, `README.md`, `CONTRIBUT
 - `make bench-pyperformance-local-cinderx-ci`: run local pyperformance CI-shape debug subset with required CinderX baseline.
 - `make bench-publish-check`: enforce CinderX-baselined publish guard for latest benchmark summaries.
 - `make bench-dossier`: export benchmark metadata dossier JSON under `data/summary/reports/`.
+- `CINDERX_PYTHON=/path/to/cinderx-python bash scripts/bench/run_quickstart_matrix.sh`: run quickstart matrix with default pyperformance CinderX feature bootstrap (`cpython` plain control + auto-bootstrap on `cpython-cinderx` lane only).
+- `.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto`: apply project-style CinderX bootstrap actions (JIT/static-loader path) for local verification.
 - Python environments and package installs are managed with `uv` (see setup below).
 
 First-time setup:
@@ -55,6 +57,8 @@ uv pip install --python .venv/bin/python pyperformance
   - Equivalent direct command:
     - `CXXFLAGS='-include cstdlib' CMAKE_ARGS='-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON' uv pip install --python .venv/bin/python -v --no-cache-dir --reinstall cinderx`
   - `PYTHONPATH=src` does not affect this native build failure mode.
+  - Runtime caveat:
+    - If `import cinderx` succeeds but `get_import_error()` reports missing symbol `__ZNSt3__113__hash_memoryEPKvm`, treat the runtime as non-CinderX-capable for JIT/static benchmarking and gather diagnostics with `bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode permissive`.
 
 ## Coding Style & Naming Conventions
 - Follow `.editorconfig`: UTF-8, LF, trailing whitespace trimmed, final newline.

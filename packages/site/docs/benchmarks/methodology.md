@@ -28,25 +28,29 @@ Source: [pyperformance documentation](https://pyperformance.readthedocs.io/)
 - `--cpython-cinderx` is strictly validated; if the runtime does not expose CinderX (`import cinderx`),
   the run fails instead of labeling it as a CinderX baseline.
 
-## Experimental bootstrap for CinderX feature toggles
+## CinderX bootstrap policy for pyperformance
 
-For controlled experiments, pyperformance runs can inject inline Python via a temporary
-`sitecustomize` shim:
+When `--cpython-cinderx` is provided, pyperformance runs auto-apply CinderX bootstrap profile
+`cinderx-all-features` via a temporary `sitecustomize` shim:
 
 ```bash
 cxc bench run \
   --suite pyperformance \
   --python /path/to/python3.14 \
   --cpython-cinderx /path/to/cinderx-python \
-  --require-cinderx-baseline \
-  --pyperformance-bootstrap-inline "import cinderx; 'init' in dir(cinderx) and cinderx.init()"
+  --require-cinderx-baseline
 ```
 
 Notes:
 
-- This is experimental and intended for feature-enablement exploration, not default headline runs.
-- The dashboard surfaces bootstrap-enabled state and bootstrap hash for traceability.
-- Keep a non-bootstrap control run with identical machine/toolchain settings when making claims.
+- This default bootstrap is lane-targeted: plain `cpython` remains the control run.
+- Override the default profile with `--pyperformance-bootstrap-profile <name>` when needed.
+- Supported profiles: `cinderx-init`, `cinderx-all-features`, `cinderx-jit-auto`,
+  `cinderx-jit-compile-after-n-calls`,
+  `cinderx-jit-disable`, `cinderx-static-loader`, `cinderx-static-loader-patching`.
+- Custom inline hooks still exist via `--pyperformance-bootstrap-inline`, but profile mode is the
+  preferred path for reproducible CinderX feature experiments.
+- The dashboard surfaces bootstrap-enabled state, profile, mode, and bootstrap hash for traceability.
 
 Example smoke run with CinderX baseline plus interpreter comparison runtime:
 

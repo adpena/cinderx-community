@@ -34,6 +34,7 @@ echo
 echo "Usage examples:"
 echo "  bash scripts/bench/run_quickstart_matrix.sh"
 echo "  CINDERX_PYTHON=/path/to/cinderx-python bash scripts/bench/run_quickstart_matrix.sh"
+echo "  CINDERX_PYTHON=/path/to/cinderx-python PYPERF_BOOTSTRAP_PROFILE=cinderx-jit-compile-after-n-calls PYPERF_BOOTSTRAP_JIT_COMPILE_AFTER_N_CALLS=40000 bash scripts/bench/run_quickstart_matrix.sh"
 if [[ -n "${pypy_python}" ]]; then
   echo "  PYPY_PYTHON=${pypy_python} bash scripts/bench/run_quickstart_matrix.sh"
 fi

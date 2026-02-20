@@ -62,11 +62,16 @@ type SummaryMetadata = {
     pyperformance_benchmarks?: string[] | null;
     pyperformance_bootstrap_inline_enabled?: boolean;
     pyperformance_bootstrap_inline_sha256?: string;
+    pyperformance_bootstrap_profile?: string | null;
+    pyperformance_bootstrap_profile_source?: string | null;
+    pyperformance_bootstrap_jit_compile_after_n_calls?: number | null;
+    pyperformance_bootstrap_target_runtime_key?: string | null;
   };
   toolchain?: {
     benchmark_repo_sha?: string;
     pyperformance_version?: string;
     pyperformance_command?: string[];
+    pyperformance_bootstrap_mode?: string;
     cinderx_upstream?: {
       repo_url?: string;
       commit_sha?: string;
@@ -356,6 +361,21 @@ export default function BenchSummaryDashboard() {
   const guardrails = summary?.metadata?.guardrails;
   const ciShapeRun = Boolean(runConfig?.ci_mode);
   const cinderxPolicyEnforced = Boolean(runConfig?.require_cinderx_baseline);
+  const bootstrapEnabled = Boolean(runConfig?.pyperformance_bootstrap_inline_enabled);
+  const bootstrapProfile = runConfig?.pyperformance_bootstrap_profile ?? null;
+  const bootstrapProfileSource =
+    runConfig?.pyperformance_bootstrap_profile_source ??
+    (bootstrapEnabled ? 'unknown' : 'disabled');
+  const bootstrapLabel = bootstrapEnabled
+    ? bootstrapProfile
+      ? `profile: ${bootstrapProfile}`
+      : 'custom-inline'
+    : 'disabled';
+  const bootstrapBadgeClass = !bootstrapEnabled
+    ? styles.badgeNeutral
+    : bootstrapProfileSource === 'auto-default'
+      ? styles.badgeGood
+      : styles.badgeWarn;
 
   const workloadOptions = useMemo(() => {
     if (!summary) {
@@ -521,22 +541,22 @@ export default function BenchSummaryDashboard() {
             <span className={cinderxPolicyEnforced ? styles.badgeGood : styles.badgeWarn}>
               {cinderxPolicyEnforced ? 'policy-enforced' : 'not policy-enforced'}
             </span>
-            <span
-              className={
-                runConfig?.pyperformance_bootstrap_inline_enabled
-                  ? styles.badgeWarn
-                  : styles.badgeNeutral
-              }
-            >
-              bootstrap inline:{' '}
-              {runConfig?.pyperformance_bootstrap_inline_enabled ? 'enabled' : 'disabled'}
-            </span>
+            <span className={bootstrapBadgeClass}>bootstrap: {bootstrapLabel}</span>
           </div>
           <ul>
             <li>Workload classes: {workloadOptions.length}</li>
             <li>Startup samples: {runConfig?.startup_samples ?? 'n/a'}</li>
             <li>Samples per benchmark: {runConfig?.samples ?? 'n/a'}</li>
             <li>Warmups per benchmark: {runConfig?.warmups ?? 'n/a'}</li>
+            <li>
+              Bootstrap JIT threshold:{' '}
+              {runConfig?.pyperformance_bootstrap_jit_compile_after_n_calls ?? 'n/a'}
+            </li>
+            <li>Bootstrap profile source: {bootstrapProfileSource}</li>
+            <li>
+              Bootstrap target runtime:{' '}
+              {runConfig?.pyperformance_bootstrap_target_runtime_key ?? 'n/a'}
+            </li>
             <li>Skipped runtimes: {summary.skipped_runtimes.length}</li>
           </ul>
         </article>
@@ -578,6 +598,12 @@ export default function BenchSummaryDashboard() {
                 ? toolchain.pyperformance_command.join(' ')
                 : 'unknown'}
             </dd>
+            <dt>Bootstrap mode</dt>
+            <dd>{toolchain?.pyperformance_bootstrap_mode ?? 'disabled'}</dd>
+            <dt>Bootstrap profile</dt>
+            <dd>{runConfig?.pyperformance_bootstrap_profile ?? 'n/a'}</dd>
+            <dt>Bootstrap profile source</dt>
+            <dd>{bootstrapProfileSource}</dd>
             <dt>Bootstrap hash</dt>
             <dd>{runConfig?.pyperformance_bootstrap_inline_sha256 ?? 'n/a'}</dd>
           </dl>
