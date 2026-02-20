@@ -2,13 +2,6 @@
   "updated_at_utc": "2026-02-19T22:30:06Z",
   "entries": [
     {
-      "file": "pyperformance-2026-02-19-runnervmez679-20260219T222918Z.json",
-      "generated_at_utc": "2026-02-19T22:29:18.368472+00:00",
-      "machine": "runnervmez679",
-      "run_id": "20260219T222918Z",
-      "suite": "pyperformance"
-    },
-    {
       "file": "smoke-2026-02-19-runnervmez679-20260219T222811Z.json",
       "generated_at_utc": "2026-02-19T22:28:11.186595+00:00",
       "machine": "runnervmez679",

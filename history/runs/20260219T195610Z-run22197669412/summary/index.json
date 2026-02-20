@@ -8,13 +8,6 @@
       "suite": "smoke"
     },
     {
-      "file": "pyperformance-2026-02-19-Alejandros-MacBook-Pro-20260219T184031Z.json",
-      "generated_at_utc": "2026-02-19T18:40:31.933974+00:00",
-      "machine": "Alejandros-MacBook-Pro",
-      "run_id": "20260219T184031Z",
-      "suite": "pyperformance"
-    },
-    {
       "file": "smoke-2026-02-19-Alejandros-MacBook-Pro-20260219T184031Z.json",
       "generated_at_utc": "2026-02-19T18:40:31.933971+00:00",
       "machine": "Alejandros-MacBook-Pro",
@@ -22,25 +15,11 @@
       "suite": "smoke"
     },
     {
-      "file": "pyperformance-2026-02-19-Alejandros-MacBook-Pro-20260219T183305Z.json",
-      "generated_at_utc": "2026-02-19T18:33:05.871667+00:00",
-      "machine": "Alejandros-MacBook-Pro",
-      "run_id": "20260219T183305Z",
-      "suite": "pyperformance"
-    },
-    {
       "file": "smoke-2026-02-19-Alejandros-MacBook-Pro-20260219T183249Z.json",
       "generated_at_utc": "2026-02-19T18:32:49.419510+00:00",
       "machine": "Alejandros-MacBook-Pro",
       "run_id": "20260219T183249Z",
       "suite": "smoke"
-    },
-    {
-      "file": "pyperformance-2026-02-19-Alejandros-MacBook-Pro-20260219T171200Z.json",
-      "generated_at_utc": "2026-02-19T17:12:00.005389+00:00",
-      "machine": "Alejandros-MacBook-Pro",
-      "run_id": "20260219T171200Z",
-      "suite": "pyperformance"
     },
     {
       "file": "smoke-2026-02-19-Alejandros-MacBook-Pro-20260219T171154Z.json",
