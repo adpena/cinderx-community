@@ -267,7 +267,7 @@ jobs:
             exit 1
           fi
 
-          pyperf_ci_mode="$(jq -r '.metadata.run_config.ci_mode // empty' "${pyperf_latest}")"
+          pyperf_ci_mode="$(jq -r '(.metadata.run_config.ci_mode // false) | tostring' "${pyperf_latest}")"
           if [[ "${pyperf_ci_mode}" != "false" ]]; then
             echo "::error::Publishable pyperformance summary is CI-mode (${pyperf_ci_mode}); expected full run (ci_mode=false)."
             exit 1
