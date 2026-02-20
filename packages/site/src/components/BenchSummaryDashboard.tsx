@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 import styles from './BenchSummaryDashboard.module.css';
 
@@ -78,8 +79,6 @@ type CinderxComparisonRow = {
   runtimeCompileSeconds: number | null;
 };
 
-const INDEX_URL = '/data/summary/index.json';
-
 function formatSignedPercent(value: number): string {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(1)}%`;
@@ -110,6 +109,9 @@ function chooseComparisonRuntime(runtimes: RuntimeSummary[]): string {
 }
 
 export default function BenchSummaryDashboard() {
+  const indexUrl = useBaseUrl('/data/summary/index.json');
+  const summaryBaseUrl = useBaseUrl('/data/summary/');
+
   const [index, setIndex] = useState<SummaryIndex | null>(null);
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [summary, setSummary] = useState<SmokeSummary | null>(null);
@@ -122,10 +124,10 @@ export default function BenchSummaryDashboard() {
 
   useEffect(() => {
     let active = true;
-    fetch(INDEX_URL)
+    fetch(indexUrl)
       .then((response) => {
         if (!response.ok) {
-          throw new Error(`Could not load ${INDEX_URL}`);
+          throw new Error(`Could not load ${indexUrl}`);
         }
         return response.json() as Promise<SummaryIndex>;
       })
@@ -148,7 +150,7 @@ export default function BenchSummaryDashboard() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [indexUrl]);
 
   useEffect(() => {
     if (!index) {
@@ -163,7 +165,7 @@ export default function BenchSummaryDashboard() {
     Promise.all(
       entries.map(async (entry) => {
         try {
-          const response = await fetch(`/data/summary/${entry.file}`);
+          const response = await fetch(`${summaryBaseUrl}${entry.file}`);
           if (!response.ok) {
             throw new Error('summary load failed');
           }
@@ -198,7 +200,7 @@ export default function BenchSummaryDashboard() {
     return () => {
       active = false;
     };
-  }, [index]);
+  }, [index, summaryBaseUrl]);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -207,10 +209,10 @@ export default function BenchSummaryDashboard() {
     }
 
     let active = true;
-    fetch(`/data/summary/${selectedFile}`)
+    fetch(`${summaryBaseUrl}${selectedFile}`)
       .then((response) => {
         if (!response.ok) {
-          throw new Error(`Could not load /data/summary/${selectedFile}`);
+          throw new Error(`Could not load ${summaryBaseUrl}${selectedFile}`);
         }
         return response.json() as Promise<SmokeSummary>;
       })
@@ -247,7 +249,7 @@ export default function BenchSummaryDashboard() {
     return () => {
       active = false;
     };
-  }, [selectedFile]);
+  }, [selectedFile, summaryBaseUrl]);
 
   const executedRuntimes = useMemo(() => {
     if (!summary) {
