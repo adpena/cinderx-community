@@ -311,18 +311,11 @@ jobs:
             echo "::error::Run coherence check failed: missing generated_at_utc in latest summary payload."
             exit 1
           fi
-          python3 - "${smoke_generated_at}" "${pyperf_generated_at}" <<'PY'
-import datetime
-import sys
-
-smoke = datetime.datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))
-pyperf = datetime.datetime.fromisoformat(sys.argv[2].replace("Z", "+00:00"))
-skew = abs((smoke - pyperf).total_seconds())
-if skew > 3600:
-    raise SystemExit(
-        f"Run coherence check failed: generated_at_utc skew {skew:.1f}s exceeds 3600s."
-    )
-PY
+          skew_seconds="$(python3 -c 'import datetime,sys; smoke=datetime.datetime.fromisoformat(sys.argv[1].replace(\"Z\", \"+00:00\")); pyperf=datetime.datetime.fromisoformat(sys.argv[2].replace(\"Z\", \"+00:00\")); print(abs((smoke-pyperf).total_seconds()))' "${smoke_generated_at}" "${pyperf_generated_at}")"
+          if ! awk "BEGIN { exit !(${skew_seconds} <= 3600) }"; then
+            echo "::error::Run coherence check failed: generated_at_utc skew ${skew_seconds}s exceeds 3600s."
+            exit 1
+          fi
 
           if [[ -f "${summary_root}/index.json" ]]; then
             jq \
