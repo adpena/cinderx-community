@@ -606,176 +606,180 @@ export default function BenchSummaryDashboard() {
         </article>
       </div>
 
-      <h3>Published run history</h3>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>Generated (UTC)</th>
-            <th>Run ID</th>
-            <th>Machine</th>
-            <th>Suite</th>
-            <th>Benchmarks</th>
-            <th>Runtimes</th>
-            <th>Baseline</th>
-            <th>Mode</th>
-            <th>Policy</th>
-          </tr>
-        </thead>
-        <tbody>
-          {publishedRuns.map((run) => (
-            <tr key={`published-run-${run.file}`}>
-              <td>{run.generated_at_utc}</td>
-              <td>{run.run_id}</td>
-              <td>{run.machine}</td>
-              <td>{run.suite}</td>
-              <td>{run.benchmarkCount}</td>
-              <td>{run.executedRuntimes}</td>
-              <td>
-                <span className={run.cinderxBaselined ? styles.flagGood : styles.flagWarn}>
-                  {run.baselineRuntime}
-                </span>
-              </td>
-              <td>{asBadgeMode(run.ciMode, run.pyperformanceMode)}</td>
-              <td>{run.policyEnforced ? 'enforced' : 'not-enforced'}</td>
+      <div className={styles.historyBlock}>
+        <h3 className={styles.sectionHeading}>Published run history</h3>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Generated (UTC)</th>
+              <th>Run ID</th>
+              <th>Machine</th>
+              <th>Suite</th>
+              <th>Benchmarks</th>
+              <th>Runtimes</th>
+              <th>Baseline</th>
+              <th>Mode</th>
+              <th>Policy</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className={styles.presets}>
-        <button
-          type="button"
-          className={`${styles.presetButton} ${viewMode === 'vs-cinderx' ? styles.presetActive : ''}`}
-          onClick={() => {
-            setViewMode('vs-cinderx');
-            setShowAllRows(false);
-          }}
-          disabled={!canCompareVsCinderx}
-          title={
-            canCompareVsCinderx
-              ? 'Compare runtimes directly against CinderX baseline'
-              : 'CinderX baseline plus at least one additional runtime is required'
-          }
-        >
-          CinderX headline view
-        </button>
-        <button
-          type="button"
-          className={`${styles.presetButton} ${viewMode === 'runtime' ? styles.presetActive : ''}`}
-          onClick={() => {
-            setViewMode('runtime');
-            setShowAllRows(false);
-          }}
-        >
-          Secondary runtime view
-        </button>
+          </thead>
+          <tbody>
+            {publishedRuns.map((run) => (
+              <tr key={`published-run-${run.file}`}>
+                <td>{run.generated_at_utc}</td>
+                <td>{run.run_id}</td>
+                <td>{run.machine}</td>
+                <td>{run.suite}</td>
+                <td>{run.benchmarkCount}</td>
+                <td>{run.executedRuntimes}</td>
+                <td>
+                  <span className={run.cinderxBaselined ? styles.flagGood : styles.flagWarn}>
+                    {run.baselineRuntime}
+                  </span>
+                </td>
+                <td>{asBadgeMode(run.ciMode, run.pyperformanceMode)}</td>
+                <td>{run.policyEnforced ? 'enforced' : 'not-enforced'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      <div className={styles.controls}>
-        <label>
-          Result set
-          <select value={selectedFile} onChange={(event) => setSelectedFile(event.target.value)}>
-            {index.entries.map((entry) => (
-              <option key={entry.file} value={entry.file}>
-                {entry.generated_at_utc} | {entry.machine} | {entry.run_id}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {viewMode === 'runtime' ? (
-          <label>
-            Runtime
-            <select
-              value={selectedRuntime}
-              onChange={(event) => {
-                setSelectedRuntime(event.target.value);
-                setViewMode('runtime');
-              }}
-            >
-              {executedRuntimes.map((runtime) => (
-                <option key={runtime.runtime} value={runtime.runtime}>
-                  {runtime.runtime_label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-
-        {viewMode === 'vs-cinderx' && canCompareVsCinderx ? (
-          <label>
-            Comparison runtime
-            <select
-              value={comparisonRuntime}
-              onChange={(event) => setComparisonRuntime(event.target.value)}
-            >
-              {comparisonRuntimeOptions.map((runtime) => (
-                <option key={`compare-${runtime.runtime}`} value={runtime.runtime}>
-                  {runtime.runtime_label}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-
-        <label>
-          Workload class
-          <select
-            value={selectedWorkload}
-            onChange={(event) => setSelectedWorkload(event.target.value)}
-          >
-            <option value="all">All</option>
-            {workloadOptions.map((workload) => (
-              <option key={workload} value={workload}>
-                {workload}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          Benchmark filter
-          <input
-            type="text"
-            value={benchmarkFilter}
-            placeholder="substring match (e.g. json, regex, startup)"
-            onChange={(event) => setBenchmarkFilter(event.target.value)}
-          />
-        </label>
-      </div>
-
-      {!cinderxBaseline ? (
-        <p className={styles.warning}>
-          This summary is not CinderX-baselined. Run with `--cpython-cinderx` to produce direct
-          CinderX comparisons.
-        </p>
-      ) : null}
-      {ciShapeRun ? (
-        <p className={styles.notice}>
-          CI-shape mode is enabled for this run. Treat this as reproducibility diagnostics, not a
-          headline performance claim.
-        </p>
-      ) : null}
-
-      <div className={styles.rowMeta}>
-        <p>
-          Showing {visibleCount} of {totalCount} benchmark rows
-          {benchmarkFilter ? ' after filter' : ''}.
-        </p>
-        {totalCount > BENCHMARK_DISPLAY_LIMIT ? (
+      <div className={styles.controlsBlock}>
+        <div className={styles.presets}>
           <button
             type="button"
-            className={styles.inlineButton}
-            onClick={() => setShowAllRows((value) => !value)}
+            className={`${styles.presetButton} ${viewMode === 'vs-cinderx' ? styles.presetActive : ''}`}
+            onClick={() => {
+              setViewMode('vs-cinderx');
+              setShowAllRows(false);
+            }}
+            disabled={!canCompareVsCinderx}
+            title={
+              canCompareVsCinderx
+                ? 'Compare runtimes directly against CinderX baseline'
+                : 'CinderX baseline plus at least one additional runtime is required'
+            }
           >
-            {showAllRows ? 'Show top rows only' : `Show all ${totalCount} rows`}
+            CinderX headline view
           </button>
+          <button
+            type="button"
+            className={`${styles.presetButton} ${viewMode === 'runtime' ? styles.presetActive : ''}`}
+            onClick={() => {
+              setViewMode('runtime');
+              setShowAllRows(false);
+            }}
+          >
+            Secondary runtime view
+          </button>
+        </div>
+
+        <div className={styles.controls}>
+          <label>
+            Result set
+            <select value={selectedFile} onChange={(event) => setSelectedFile(event.target.value)}>
+              {index.entries.map((entry) => (
+                <option key={entry.file} value={entry.file}>
+                  {entry.generated_at_utc} | {entry.machine} | {entry.run_id}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {viewMode === 'runtime' ? (
+            <label>
+              Runtime
+              <select
+                value={selectedRuntime}
+                onChange={(event) => {
+                  setSelectedRuntime(event.target.value);
+                  setViewMode('runtime');
+                }}
+              >
+                {executedRuntimes.map((runtime) => (
+                  <option key={runtime.runtime} value={runtime.runtime}>
+                    {runtime.runtime_label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          {viewMode === 'vs-cinderx' && canCompareVsCinderx ? (
+            <label>
+              Comparison runtime
+              <select
+                value={comparisonRuntime}
+                onChange={(event) => setComparisonRuntime(event.target.value)}
+              >
+                {comparisonRuntimeOptions.map((runtime) => (
+                  <option key={`compare-${runtime.runtime}`} value={runtime.runtime}>
+                    {runtime.runtime_label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          <label>
+            Workload class
+            <select
+              value={selectedWorkload}
+              onChange={(event) => setSelectedWorkload(event.target.value)}
+            >
+              <option value="all">All</option>
+              {workloadOptions.map((workload) => (
+                <option key={workload} value={workload}>
+                  {workload}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            Benchmark filter
+            <input
+              type="text"
+              value={benchmarkFilter}
+              placeholder="substring match (e.g. json, regex, startup)"
+              onChange={(event) => setBenchmarkFilter(event.target.value)}
+            />
+          </label>
+        </div>
+
+        {!cinderxBaseline ? (
+          <p className={styles.warning}>
+            This summary is not CinderX-baselined. Run with `--cpython-cinderx` to produce direct
+            CinderX comparisons.
+          </p>
         ) : null}
+        {ciShapeRun ? (
+          <p className={styles.notice}>
+            CI-shape mode is enabled for this run. Treat this as reproducibility diagnostics, not a
+            headline performance claim.
+          </p>
+        ) : null}
+
+        <div className={styles.rowMeta}>
+          <p>
+            Showing {visibleCount} of {totalCount} benchmark rows
+            {benchmarkFilter ? ' after filter' : ''}.
+          </p>
+          {totalCount > BENCHMARK_DISPLAY_LIMIT ? (
+            <button
+              type="button"
+              className={styles.inlineButton}
+              onClick={() => setShowAllRows((value) => !value)}
+            >
+              {showAllRows ? 'Show top rows only' : `Show all ${totalCount} rows`}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {viewMode === 'runtime' && cinderxBaseline ? (
         <>
-          <h3>
+          <h3 className={styles.sectionHeading}>
             Secondary runtime chart ({runtimeLabel(summary, selectedRuntime)} vs{' '}
             {runtimeLabel(summary, summary.baseline_runtime)})
           </h3>
@@ -795,7 +799,7 @@ export default function BenchSummaryDashboard() {
             })}
           </div>
 
-          <h3>Secondary runtime statistics</h3>
+          <h3 className={styles.sectionHeading}>Secondary runtime statistics</h3>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -834,7 +838,7 @@ export default function BenchSummaryDashboard() {
         </p>
       ) : (
         <>
-          <h3>CinderX vs {selectedComparisonRuntimeLabel}</h3>
+          <h3 className={styles.sectionHeading}>CinderX vs {selectedComparisonRuntimeLabel}</h3>
           {canCompareVsCinderx ? (
             <>
               <div className={styles.chart}>
@@ -852,7 +856,7 @@ export default function BenchSummaryDashboard() {
                 })}
               </div>
 
-              <h3>CinderX delta table</h3>
+              <h3 className={styles.sectionHeading}>CinderX delta table</h3>
               <table className={styles.table}>
                 <thead>
                   <tr>
@@ -899,7 +903,7 @@ export default function BenchSummaryDashboard() {
         </>
       )}
 
-      <h3>Runtime startup (mean seconds)</h3>
+      <h3 className={styles.sectionHeading}>Runtime startup (mean seconds)</h3>
       <table className={styles.table}>
         <thead>
           <tr>

@@ -1,7 +1,7 @@
 .wrapper {
   border: 1px solid rgba(24, 60, 72, 0.2);
   border-radius: 16px;
-  padding: 1rem;
+  padding: 1.15rem;
   background:
     radial-gradient(circle at top right, rgba(113, 186, 205, 0.14), transparent 38%),
     linear-gradient(180deg, #f8fcfd 0%, #ffffff 100%);
@@ -109,7 +109,7 @@
 }
 
 .panelGrid {
-  margin-top: 0.75rem;
+  margin-top: 0.9rem;
   display: grid;
   gap: 0.75rem;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -185,8 +185,25 @@
   color: #355764;
 }
 
+.sectionHeading {
+  margin: 1.25rem 0 0.65rem;
+  font-size: 1.07rem;
+  line-height: 1.25;
+  color: #173f4c;
+}
+
+.historyBlock {
+  margin-top: 0.25rem;
+}
+
+.controlsBlock {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(28, 64, 76, 0.12);
+}
+
 .presets {
-  margin-top: 0.95rem;
+  margin-top: 0.15rem;
   display: flex;
   gap: 0.45rem;
   flex-wrap: wrap;
@@ -215,7 +232,7 @@
 }
 
 .controls {
-  margin-top: 0.8rem;
+  margin-top: 0.95rem;
   display: grid;
   gap: 0.65rem;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -241,7 +258,7 @@
 }
 
 .rowMeta {
-  margin-top: 0.75rem;
+  margin-top: 0.95rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -266,7 +283,7 @@
 }
 
 .chart {
-  margin-top: 0.58rem;
+  margin-top: 0.72rem;
   display: grid;
   gap: 0.45rem;
 }
@@ -313,7 +330,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 0.48rem;
+  margin-top: 0.62rem;
 }
 
 .table th,
