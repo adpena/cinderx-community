@@ -21,9 +21,11 @@ Repo-level governance and automation live in `.github/`, `README.md`, `CONTRIBUT
 - `bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode permissive`: staged CinderX install + import probe + diagnostics capture (CI parity path).
 - `make bench-toolchain`: install local benchmark dependencies (`pyperformance`).
 - `make bench-smoke-local`: run local smoke suite in CI-shape mode.
-- `make bench-pyperformance-local`: run local pyperformance suite in CI-shape mode.
+- `make bench-pyperformance-local`: run local full pyperformance suite.
 - `make bench-smoke-local-cinderx`: run local smoke suite with required CinderX baseline (`CINDERX_PYTHON=...`).
-- `make bench-pyperformance-local-cinderx`: run local pyperformance suite with required CinderX baseline (`CINDERX_PYTHON=...`).
+- `make bench-pyperformance-local-cinderx`: run local full pyperformance suite with required CinderX baseline (`CINDERX_PYTHON=...`).
+- `make bench-pyperformance-local-ci`: run local pyperformance CI-shape debug subset.
+- `make bench-pyperformance-local-cinderx-ci`: run local pyperformance CI-shape debug subset with required CinderX baseline.
 - `make bench-publish-check`: enforce CinderX-baselined publish guard for latest benchmark summaries.
 - `make bench-dossier`: export benchmark metadata dossier JSON under `data/summary/reports/`.
 - Python environments and package installs are managed with `uv` (see setup below).

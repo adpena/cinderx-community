@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -11,6 +12,7 @@ import socket
 import statistics
 import subprocess
 import sys
+import tempfile
 import textwrap
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -811,7 +813,9 @@ def _validate_publish_suite_coherence(
     return failures
 
 
-def _run_command(args: list[str], *, timeout_s: int = 90) -> subprocess.CompletedProcess[str]:
+def _run_command(
+    args: list[str], *, timeout_s: int = 90, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
             args,
@@ -819,6 +823,7 @@ def _run_command(args: list[str], *, timeout_s: int = 90) -> subprocess.Complete
             capture_output=True,
             text=True,
             timeout=timeout_s,
+            env=env,
         )
     except FileNotFoundError as exc:
         raise ValueError(f"Executable not found: {args[0]}") from exc
@@ -841,6 +846,46 @@ def _version_line(executable: Path) -> str:
         if combined:
             return combined.splitlines()[0].strip()
     return "unknown"
+
+
+def _prepare_pyperformance_bootstrap(
+    inline_code: str | None,
+) -> tuple[dict[str, str], tempfile.TemporaryDirectory[str] | None, str | None]:
+    bootstrap = (inline_code or "").strip()
+    if not bootstrap:
+        return {}, None, None
+
+    tempdir = tempfile.TemporaryDirectory(prefix="cxc-pyperf-bootstrap-")
+    shim_root = Path(tempdir.name)
+    sitecustomize = textwrap.dedent(
+        """
+        import os
+        import sys
+
+        bootstrap = os.environ.get("CXC_PYPERF_BOOTSTRAP_INLINE", "").strip()
+        if bootstrap:
+            namespace = {}
+            try:
+                exec(bootstrap, namespace, namespace)
+            except Exception as exc:  # pragma: no cover - surfaced in benchmark logs
+                print(
+                    f"[cxc-pyperf-bootstrap] inline bootstrap failed: {exc!r}",
+                    file=sys.stderr,
+                )
+                raise
+        """
+    ).strip()
+    (shim_root / "sitecustomize.py").write_text(sitecustomize, encoding="utf-8")
+
+    env = dict(os.environ)
+    current_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = (
+        f"{shim_root}{os.pathsep}{current_pythonpath}" if current_pythonpath else str(shim_root)
+    )
+    env["CXC_PYPERF_BOOTSTRAP_INLINE"] = bootstrap
+    env["CXC_PYPERF_BOOTSTRAP_MODE"] = "sitecustomize-inline"
+    bootstrap_sha256 = hashlib.sha256(bootstrap.encode("utf-8")).hexdigest()
+    return env, tempdir, bootstrap_sha256
 
 
 def _python_runtime_details(executable: Path) -> dict[str, str]:
@@ -1755,6 +1800,7 @@ def run_pyperformance_suite(
     cpython_cinderx: Path | None = None,
     pypy: Path | None = None,
     static_summary_root: Path | None = None,
+    pyperformance_bootstrap_inline: str | None = None,
 ) -> BenchmarkRunResult:
     python_hint = Path(os.path.abspath(str(python.expanduser())))
     baseline_python = Path(os.path.abspath(str(python_hint)))
@@ -1769,6 +1815,11 @@ def run_pyperformance_suite(
     machine_slug = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in machine_name)
     startup_samples = 3 if ci_mode else 5
     pyperformance_benchmarks = ["nbody"] if ci_mode else None
+    (
+        pyperformance_bootstrap_env,
+        pyperformance_bootstrap_tempdir,
+        pyperformance_bootstrap_sha256,
+    ) = _prepare_pyperformance_bootstrap(pyperformance_bootstrap_inline)
 
     guardrails = _guardrail_checks(ci_mode)
     if enforce_guardrails and guardrails["enforceable_failures"]:
@@ -1807,11 +1858,16 @@ def run_pyperformance_suite(
             "pyperformance_mode": "fast" if ci_mode else "default",
             "pyperformance_benchmarks": pyperformance_benchmarks,
             "require_cinderx_baseline": require_cinderx_baseline,
+            "pyperformance_bootstrap_inline_enabled": bool(pyperformance_bootstrap_sha256),
+            "pyperformance_bootstrap_inline_sha256": pyperformance_bootstrap_sha256,
         },
         "toolchain": {
             "benchmark_repo_sha": repo_sha,
             "pyperformance_command": pyperformance_command,
             "pyperformance_version": pyperformance_version,
+            "pyperformance_bootstrap_mode": (
+                "sitecustomize-inline" if pyperformance_bootstrap_sha256 else "disabled"
+            ),
             "cinderx_upstream": {
                 "repo_url": cinderx_pin.repo_url if cinderx_pin else "unknown",
                 "commit_sha": cinderx_pin.commit_sha if cinderx_pin else "unknown",
@@ -1878,12 +1934,21 @@ def run_pyperformance_suite(
             command.extend(["--fast", "--benchmarks", ",".join(pyperformance_benchmarks or [])])
 
         try:
-            _run_command(command, timeout_s=1200 if ci_mode else 7200)
+            if pyperformance_bootstrap_env:
+                _run_command(
+                    command,
+                    timeout_s=1200 if ci_mode else 7200,
+                    env=pyperformance_bootstrap_env,
+                )
+            else:
+                _run_command(command, timeout_s=1200 if ci_mode else 7200)
             raw_payload = json.loads(raw_report_path.read_text(encoding="utf-8"))
             normalized_rows = _normalize_pyperformance_rows(raw_payload)
         except (ValueError, OSError, json.JSONDecodeError) as exc:
             message = f"pyperformance execution failed ({exc})"
             if target.key == "cpython":
+                if pyperformance_bootstrap_tempdir is not None:
+                    pyperformance_bootstrap_tempdir.cleanup()
                 raise ValueError(
                     f"Failed to execute pyperformance baseline runtime: {exc}"
                 ) from exc
@@ -1906,6 +1971,8 @@ def run_pyperformance_suite(
         if not normalized_rows:
             message = "pyperformance run completed but no benchmark rows were parsed"
             if target.key == "cpython":
+                if pyperformance_bootstrap_tempdir is not None:
+                    pyperformance_bootstrap_tempdir.cleanup()
                 raise ValueError(message)
             skipped_runtimes.append(f"{target.key}: {message}")
             payload = {
@@ -1996,6 +2063,9 @@ def run_pyperformance_suite(
                 "executed": True,
             }
         )
+
+    if pyperformance_bootstrap_tempdir is not None:
+        pyperformance_bootstrap_tempdir.cleanup()
 
     if not runtime_case_means:
         raise ValueError("No pyperformance runtime completed successfully.")

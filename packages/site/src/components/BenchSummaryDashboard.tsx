@@ -18,6 +18,7 @@ type RuntimeSummary = {
   startup_mean_seconds: number;
   startup_stdev_seconds: number;
   executed: boolean;
+  runtime_details?: Record<string, unknown>;
 };
 
 type BenchmarkRow = {
@@ -35,7 +36,50 @@ type BenchmarkRow = {
   compile_time_seconds: number | null;
 };
 
-type SmokeSummary = {
+type GuardrailCheck = {
+  name: string;
+  status: string;
+  detail: string;
+  enforceable?: boolean;
+};
+
+type SummaryMetadata = {
+  host?: {
+    os?: string;
+    kernel?: string;
+    architecture?: string;
+    cpu_model?: string;
+    cpu_logical_count?: number;
+    ram_total_bytes?: number;
+  };
+  run_config?: {
+    ci_mode?: boolean;
+    require_cinderx_baseline?: boolean;
+    warmups?: number;
+    samples?: number;
+    startup_samples?: number;
+    pyperformance_mode?: string;
+    pyperformance_benchmarks?: string[] | null;
+    pyperformance_bootstrap_inline_enabled?: boolean;
+    pyperformance_bootstrap_inline_sha256?: string;
+  };
+  toolchain?: {
+    benchmark_repo_sha?: string;
+    pyperformance_version?: string;
+    pyperformance_command?: string[];
+    cinderx_upstream?: {
+      repo_url?: string;
+      commit_sha?: string;
+      clone_timestamp_utc?: string;
+    };
+  };
+  guardrails?: {
+    checks?: GuardrailCheck[];
+    enforceable_failures?: string[];
+  };
+};
+
+type BenchmarkSummary = {
   suite: string;
   run_id: string;
   generated_at_utc: string;
@@ -44,12 +88,7 @@ type SmokeSummary = {
   runtimes: RuntimeSummary[];
   skipped_runtimes: string[];
   benchmarks: BenchmarkRow[];
-  metadata?: {
-    run_config?: {
-      ci_mode?: boolean;
-      require_cinderx_baseline?: boolean;
-    };
-  };
+  metadata?: SummaryMetadata;
   limitations?: string[] | null;
 };
 
@@ -63,6 +102,10 @@ type PublishedRunRow = SummaryIndexEntry & {
   policyEnforced: boolean;
   ciMode: boolean;
   cinderxBaselined: boolean;
+  benchmarkCount: number;
+  executedRuntimes: number;
+  pyperformanceMode: string;
+  bootstrapEnabled: boolean;
 };
 
 type ViewMode = 'runtime' | 'vs-cinderx';
@@ -78,6 +121,8 @@ type CinderxComparisonRow = {
   runtimeRssBytes: number | null;
   runtimeCompileSeconds: number | null;
 };
+
+const BENCHMARK_DISPLAY_LIMIT = 40;
 
 function formatSignedPercent(value: number): string {
   const sign = value > 0 ? '+' : '';
@@ -98,6 +143,20 @@ function formatRssMiB(value: number | null): string {
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
+function formatRamGiB(value?: number): string {
+  if (value === undefined || Number.isNaN(value) || value <= 0) {
+    return 'unknown';
+  }
+  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GiB`;
+}
+
+function shortenSha(value?: string): string {
+  if (!value) {
+    return 'unknown';
+  }
+  return value.length > 12 ? value.slice(0, 12) : value;
+}
+
 function chooseComparisonRuntime(runtimes: RuntimeSummary[]): string {
   const executed = runtimes.filter((item) => item.executed);
   const withCpython = executed.find((item) => item.runtime === 'cpython');
@@ -108,18 +167,37 @@ function chooseComparisonRuntime(runtimes: RuntimeSummary[]): string {
   return firstNonCinderx?.runtime ?? '';
 }
 
+function runtimeLabel(summary: BenchmarkSummary | null, runtimeKey: string): string {
+  if (!summary) {
+    return runtimeKey;
+  }
+  return summary.runtimes.find((item) => item.runtime === runtimeKey)?.runtime_label ?? runtimeKey;
+}
+
+function asBadgeMode(ciMode: boolean, pyperformanceMode?: string): string {
+  if (ciMode) {
+    return 'ci-shape';
+  }
+  if (pyperformanceMode) {
+    return pyperformanceMode;
+  }
+  return 'full';
+}
+
 export default function BenchSummaryDashboard() {
   const indexUrl = useBaseUrl('/data/summary/index.json');
   const summaryBaseUrl = useBaseUrl('/data/summary/');
 
   const [index, setIndex] = useState<SummaryIndex | null>(null);
   const [selectedFile, setSelectedFile] = useState<string>('');
-  const [summary, setSummary] = useState<SmokeSummary | null>(null);
+  const [summary, setSummary] = useState<BenchmarkSummary | null>(null);
   const [publishedRuns, setPublishedRuns] = useState<PublishedRunRow[]>([]);
   const [selectedRuntime, setSelectedRuntime] = useState<string>('');
   const [comparisonRuntime, setComparisonRuntime] = useState<string>('');
   const [selectedWorkload, setSelectedWorkload] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('vs-cinderx');
+  const [benchmarkFilter, setBenchmarkFilter] = useState<string>('');
+  const [showAllRows, setShowAllRows] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
@@ -142,7 +220,7 @@ export default function BenchSummaryDashboard() {
       .catch(() => {
         if (active) {
           setError(
-            'No benchmark summaries are published yet. Run `cxc bench run --suite smoke` first.'
+            'No benchmark summaries are currently available. Publish a pyperformance summary first.'
           );
         }
       });
@@ -159,8 +237,7 @@ export default function BenchSummaryDashboard() {
     }
 
     let active = true;
-    const maxRows = 12;
-    const entries = index.entries.slice(0, maxRows);
+    const entries = index.entries.slice(0, 20);
 
     Promise.all(
       entries.map(async (entry) => {
@@ -169,17 +246,22 @@ export default function BenchSummaryDashboard() {
           if (!response.ok) {
             throw new Error('summary load failed');
           }
-          const payload = (await response.json()) as SmokeSummary;
+          const payload = (await response.json()) as BenchmarkSummary;
           const baselineRuntime =
             typeof payload.baseline_runtime === 'string' ? payload.baseline_runtime : 'unknown';
-          const policyEnforced = Boolean(payload.metadata?.run_config?.require_cinderx_baseline);
-          const ciMode = Boolean(payload.metadata?.run_config?.ci_mode);
+          const runConfig = payload.metadata?.run_config;
+          const policyEnforced = Boolean(runConfig?.require_cinderx_baseline);
+          const ciMode = Boolean(runConfig?.ci_mode);
           return {
             ...entry,
             baselineRuntime,
             policyEnforced,
             ciMode,
-            cinderxBaselined: baselineRuntime === 'cpython-cinderx'
+            cinderxBaselined: baselineRuntime === 'cpython-cinderx',
+            benchmarkCount: payload.benchmarks.length,
+            executedRuntimes: payload.runtimes.filter((item) => item.executed).length,
+            pyperformanceMode: runConfig?.pyperformance_mode ?? 'default',
+            bootstrapEnabled: Boolean(runConfig?.pyperformance_bootstrap_inline_enabled)
           } satisfies PublishedRunRow;
         } catch {
           return {
@@ -187,7 +269,11 @@ export default function BenchSummaryDashboard() {
             baselineRuntime: 'unavailable',
             policyEnforced: false,
             ciMode: false,
-            cinderxBaselined: false
+            cinderxBaselined: false,
+            benchmarkCount: 0,
+            executedRuntimes: 0,
+            pyperformanceMode: 'unknown',
+            bootstrapEnabled: false
           } satisfies PublishedRunRow;
         }
       })
@@ -214,7 +300,7 @@ export default function BenchSummaryDashboard() {
         if (!response.ok) {
           throw new Error(`Could not load ${summaryBaseUrl}${selectedFile}`);
         }
-        return response.json() as Promise<SmokeSummary>;
+        return response.json() as Promise<BenchmarkSummary>;
       })
       .then((payload) => {
         if (!active) {
@@ -229,6 +315,8 @@ export default function BenchSummaryDashboard() {
           '';
 
         setSelectedRuntime(baselineRuntime);
+        setBenchmarkFilter('');
+        setShowAllRows(false);
         const defaultComparisonRuntime = chooseComparisonRuntime(payload.runtimes);
         setComparisonRuntime(defaultComparisonRuntime);
         setSelectedWorkload('all');
@@ -262,13 +350,12 @@ export default function BenchSummaryDashboard() {
     return summary?.baseline_runtime === 'cpython-cinderx';
   }, [summary]);
 
-  const ciShapeRun = useMemo(() => {
-    return Boolean(summary?.metadata?.run_config?.ci_mode);
-  }, [summary]);
-
-  const cinderxPolicyEnforced = useMemo(() => {
-    return Boolean(summary?.metadata?.run_config?.require_cinderx_baseline);
-  }, [summary]);
+  const runConfig = summary?.metadata?.run_config;
+  const host = summary?.metadata?.host;
+  const toolchain = summary?.metadata?.toolchain;
+  const guardrails = summary?.metadata?.guardrails;
+  const ciShapeRun = Boolean(runConfig?.ci_mode);
+  const cinderxPolicyEnforced = Boolean(runConfig?.require_cinderx_baseline);
 
   const workloadOptions = useMemo(() => {
     if (!summary) {
@@ -281,18 +368,32 @@ export default function BenchSummaryDashboard() {
     if (!summary || !selectedRuntime) {
       return [];
     }
+    const normalizedFilter = benchmarkFilter.trim().toLowerCase();
     return summary.benchmarks
       .filter((row) => row.runtime === selectedRuntime)
       .filter((row) => selectedWorkload === 'all' || row.workload_class === selectedWorkload)
+      .filter((row) => {
+        if (!normalizedFilter) {
+          return true;
+        }
+        return row.benchmark.toLowerCase().includes(normalizedFilter);
+      })
       .sort((a, b) => (b.speedup_vs_baseline ?? 0) - (a.speedup_vs_baseline ?? 0));
-  }, [selectedRuntime, selectedWorkload, summary]);
+  }, [benchmarkFilter, selectedRuntime, selectedWorkload, summary]);
+
+  const displayedRuntimeRows = useMemo(() => {
+    if (showAllRows) {
+      return filteredRows;
+    }
+    return filteredRows.slice(0, BENCHMARK_DISPLAY_LIMIT);
+  }, [filteredRows, showAllRows]);
 
   const maxSpeedup = useMemo(() => {
-    const values = filteredRows
+    const values = displayedRuntimeRows
       .map((row) => row.speedup_vs_baseline ?? 0)
       .filter((value) => value > 0);
     return values.length > 0 ? Math.max(...values) : 1;
-  }, [filteredRows]);
+  }, [displayedRuntimeRows]);
 
   const comparisonRuntimeOptions = useMemo(() => {
     return executedRuntimes.filter((runtime) => runtime.runtime !== 'cpython-cinderx');
@@ -307,6 +408,7 @@ export default function BenchSummaryDashboard() {
       return [];
     }
 
+    const normalizedFilter = benchmarkFilter.trim().toLowerCase();
     const cinderxRows = summary.benchmarks.filter((row) => row.runtime === 'cpython-cinderx');
     const compareByBenchmark = new Map(
       summary.benchmarks
@@ -316,6 +418,12 @@ export default function BenchSummaryDashboard() {
 
     return cinderxRows
       .filter((row) => selectedWorkload === 'all' || row.workload_class === selectedWorkload)
+      .filter((row) => {
+        if (!normalizedFilter) {
+          return true;
+        }
+        return row.benchmark.toLowerCase().includes(normalizedFilter);
+      })
       .map((cinderxRow) => {
         const compareRow = compareByBenchmark.get(cinderxRow.benchmark);
         if (!compareRow) {
@@ -343,14 +451,25 @@ export default function BenchSummaryDashboard() {
       })
       .filter((row): row is CinderxComparisonRow => row !== null)
       .sort((a, b) => b.cinderxSpeedup - a.cinderxSpeedup);
-  }, [canCompareVsCinderx, comparisonRuntime, selectedWorkload, summary]);
+  }, [benchmarkFilter, canCompareVsCinderx, comparisonRuntime, selectedWorkload, summary]);
+
+  const displayedCinderxRows = useMemo(() => {
+    if (showAllRows) {
+      return cinderxComparisonRows;
+    }
+    return cinderxComparisonRows.slice(0, BENCHMARK_DISPLAY_LIMIT);
+  }, [cinderxComparisonRows, showAllRows]);
 
   const cinderxComparisonMax = useMemo(() => {
-    const values = cinderxComparisonRows
+    const values = displayedCinderxRows
       .map((row) => row.cinderxSpeedup)
       .filter((value) => value > 0);
     return values.length > 0 ? Math.max(...values) : 1;
-  }, [cinderxComparisonRows]);
+  }, [displayedCinderxRows]);
+
+  const selectedComparisonRuntimeLabel =
+    comparisonRuntimeOptions.find((item) => item.runtime === comparisonRuntime)?.runtime_label ??
+    comparisonRuntime;
 
   if (error && !summary) {
     return <p className={styles.notice}>{error}</p>;
@@ -360,23 +479,168 @@ export default function BenchSummaryDashboard() {
     return <p className={styles.notice}>Loading benchmark summaries...</p>;
   }
 
-  const selectedComparisonRuntimeLabel =
-    comparisonRuntimeOptions.find((item) => item.runtime === comparisonRuntime)?.runtime_label ??
-    comparisonRuntime;
+  const visibleCount =
+    viewMode === 'vs-cinderx' ? displayedCinderxRows.length : displayedRuntimeRows.length;
+  const totalCount = viewMode === 'vs-cinderx' ? cinderxComparisonRows.length : filteredRows.length;
 
   return (
     <section className={styles.wrapper}>
       {cinderxBaseline && cinderxPolicyEnforced ? (
         <p className={styles.claimStrong}>
-          Canonical CinderX-first summary: headline comparisons are anchored to the CinderX
-          baseline.
+          Publishable benchmark run. Headline comparisons are anchored to CinderX baseline and
+          policy-enforced metadata.
         </p>
       ) : (
         <p className={styles.claimWarning}>
-          Diagnostics-only summary (non-claim): this result is not fully CinderX-baselined and
-          policy-enforced for headline comparisons.
+          Diagnostics-only run. Do not treat this result as a headline benchmark claim.
         </p>
       )}
+
+      <div className={styles.overviewGrid}>
+        <article className={styles.overviewCard}>
+          <h3>Run at a glance</h3>
+          <ul>
+            <li>Suite: {summary.suite}</li>
+            <li>Run ID: {summary.run_id}</li>
+            <li>Generated UTC: {summary.generated_at_utc}</li>
+            <li>Machine tag: {summary.machine}</li>
+            <li>Benchmarks: {summary.benchmarks.length}</li>
+            <li>Executed runtimes: {executedRuntimes.length}</li>
+            <li>
+              Baseline: <strong>{runtimeLabel(summary, summary.baseline_runtime)}</strong>
+            </li>
+          </ul>
+        </article>
+
+        <article className={styles.overviewCard}>
+          <h3>Run mode</h3>
+          <div className={styles.badgeRow}>
+            <span className={ciShapeRun ? styles.badgeWarn : styles.badgeGood}>
+              {asBadgeMode(ciShapeRun, runConfig?.pyperformance_mode)}
+            </span>
+            <span className={cinderxPolicyEnforced ? styles.badgeGood : styles.badgeWarn}>
+              {cinderxPolicyEnforced ? 'policy-enforced' : 'not policy-enforced'}
+            </span>
+            <span
+              className={
+                runConfig?.pyperformance_bootstrap_inline_enabled
+                  ? styles.badgeWarn
+                  : styles.badgeNeutral
+              }
+            >
+              bootstrap inline:{' '}
+              {runConfig?.pyperformance_bootstrap_inline_enabled ? 'enabled' : 'disabled'}
+            </span>
+          </div>
+          <ul>
+            <li>Workload classes: {workloadOptions.length}</li>
+            <li>Startup samples: {runConfig?.startup_samples ?? 'n/a'}</li>
+            <li>Samples per benchmark: {runConfig?.samples ?? 'n/a'}</li>
+            <li>Warmups per benchmark: {runConfig?.warmups ?? 'n/a'}</li>
+            <li>Skipped runtimes: {summary.skipped_runtimes.length}</li>
+          </ul>
+        </article>
+      </div>
+
+      <div className={styles.panelGrid}>
+        <article className={styles.panel}>
+          <h3>Machine profile</h3>
+          <dl className={styles.kv}>
+            <dt>OS</dt>
+            <dd>{host?.os ?? 'unknown'}</dd>
+            <dt>Kernel</dt>
+            <dd>{host?.kernel ?? 'unknown'}</dd>
+            <dt>Architecture</dt>
+            <dd>{host?.architecture ?? 'unknown'}</dd>
+            <dt>CPU model</dt>
+            <dd>{host?.cpu_model ?? 'unknown'}</dd>
+            <dt>CPU logical count</dt>
+            <dd>{host?.cpu_logical_count ?? 'unknown'}</dd>
+            <dt>RAM</dt>
+            <dd>{formatRamGiB(host?.ram_total_bytes)}</dd>
+          </dl>
+        </article>
+
+        <article className={styles.panel}>
+          <h3>Toolchain and provenance</h3>
+          <dl className={styles.kv}>
+            <dt>Benchmark repo SHA</dt>
+            <dd>{shortenSha(toolchain?.benchmark_repo_sha)}</dd>
+            <dt>CinderX upstream SHA</dt>
+            <dd>{shortenSha(toolchain?.cinderx_upstream?.commit_sha)}</dd>
+            <dt>CinderX clone timestamp</dt>
+            <dd>{toolchain?.cinderx_upstream?.clone_timestamp_utc ?? 'unknown'}</dd>
+            <dt>pyperformance version</dt>
+            <dd>{toolchain?.pyperformance_version ?? 'unknown'}</dd>
+            <dt>pyperformance launcher</dt>
+            <dd>
+              {Array.isArray(toolchain?.pyperformance_command)
+                ? toolchain.pyperformance_command.join(' ')
+                : 'unknown'}
+            </dd>
+            <dt>Bootstrap hash</dt>
+            <dd>{runConfig?.pyperformance_bootstrap_inline_sha256 ?? 'n/a'}</dd>
+          </dl>
+        </article>
+
+        <article className={styles.panel}>
+          <h3>Guardrails status</h3>
+          {guardrails?.checks && guardrails.checks.length > 0 ? (
+            <ul className={styles.guardrailList}>
+              {guardrails.checks.map((check) => (
+                <li key={check.name}>
+                  <span className={styles.guardrailName}>{check.name}</span>
+                  <span className={styles.guardrailStatus}>{check.status}</span>
+                  <span className={styles.guardrailDetail}>{check.detail}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.noticeInline}>No guardrail checks captured in metadata.</p>
+          )}
+          {guardrails?.enforceable_failures && guardrails.enforceable_failures.length > 0 ? (
+            <p className={styles.warningInline}>
+              Enforceable failures: {guardrails.enforceable_failures.join('; ')}
+            </p>
+          ) : null}
+        </article>
+      </div>
+
+      <h3>Published run history</h3>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th>Generated (UTC)</th>
+            <th>Run ID</th>
+            <th>Machine</th>
+            <th>Suite</th>
+            <th>Benchmarks</th>
+            <th>Runtimes</th>
+            <th>Baseline</th>
+            <th>Mode</th>
+            <th>Policy</th>
+          </tr>
+        </thead>
+        <tbody>
+          {publishedRuns.map((run) => (
+            <tr key={`published-run-${run.file}`}>
+              <td>{run.generated_at_utc}</td>
+              <td>{run.run_id}</td>
+              <td>{run.machine}</td>
+              <td>{run.suite}</td>
+              <td>{run.benchmarkCount}</td>
+              <td>{run.executedRuntimes}</td>
+              <td>
+                <span className={run.cinderxBaselined ? styles.flagGood : styles.flagWarn}>
+                  {run.baselineRuntime}
+                </span>
+              </td>
+              <td>{asBadgeMode(run.ciMode, run.pyperformanceMode)}</td>
+              <td>{run.policyEnforced ? 'enforced' : 'not-enforced'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <div className={styles.presets}>
         <button
@@ -384,6 +648,7 @@ export default function BenchSummaryDashboard() {
           className={`${styles.presetButton} ${viewMode === 'vs-cinderx' ? styles.presetActive : ''}`}
           onClick={() => {
             setViewMode('vs-cinderx');
+            setShowAllRows(false);
           }}
           disabled={!canCompareVsCinderx}
           title={
@@ -392,20 +657,23 @@ export default function BenchSummaryDashboard() {
               : 'CinderX baseline plus at least one additional runtime is required'
           }
         >
-          CinderX Headline View
+          CinderX headline view
         </button>
         <button
           type="button"
           className={`${styles.presetButton} ${viewMode === 'runtime' ? styles.presetActive : ''}`}
-          onClick={() => setViewMode('runtime')}
+          onClick={() => {
+            setViewMode('runtime');
+            setShowAllRows(false);
+          }}
         >
-          Secondary Runtime View
+          Secondary runtime view
         </button>
       </div>
 
       <div className={styles.controls}>
         <label>
-          Result Set
+          Result set
           <select value={selectedFile} onChange={(event) => setSelectedFile(event.target.value)}>
             {index.entries.map((entry) => (
               <option key={entry.file} value={entry.file}>
@@ -434,8 +702,24 @@ export default function BenchSummaryDashboard() {
           </label>
         ) : null}
 
+        {viewMode === 'vs-cinderx' && canCompareVsCinderx ? (
+          <label>
+            Comparison runtime
+            <select
+              value={comparisonRuntime}
+              onChange={(event) => setComparisonRuntime(event.target.value)}
+            >
+              {comparisonRuntimeOptions.map((runtime) => (
+                <option key={`compare-${runtime.runtime}`} value={runtime.runtime}>
+                  {runtime.runtime_label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <label>
-          Workload Class
+          Workload class
           <select
             value={selectedWorkload}
             onChange={(event) => setSelectedWorkload(event.target.value)}
@@ -448,75 +732,17 @@ export default function BenchSummaryDashboard() {
             ))}
           </select>
         </label>
+
+        <label>
+          Benchmark filter
+          <input
+            type="text"
+            value={benchmarkFilter}
+            placeholder="substring match (e.g. json, regex, startup)"
+            onChange={(event) => setBenchmarkFilter(event.target.value)}
+          />
+        </label>
       </div>
-
-      {viewMode === 'vs-cinderx' && canCompareVsCinderx ? (
-        <div className={styles.controls}>
-          <label>
-            Comparison Runtime
-            <select
-              value={comparisonRuntime}
-              onChange={(event) => setComparisonRuntime(event.target.value)}
-            >
-              {comparisonRuntimeOptions.map((runtime) => (
-                <option key={`compare-${runtime.runtime}`} value={runtime.runtime}>
-                  {runtime.runtime_label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      ) : null}
-
-      <div className={styles.meta}>
-        <p>
-          <strong>Suite:</strong> {summary.suite}
-        </p>
-        <p>
-          <strong>Run ID:</strong> {summary.run_id}
-        </p>
-        <p>
-          <strong>Generated:</strong> {summary.generated_at_utc}
-        </p>
-        <p>
-          <strong>Machine:</strong> {summary.machine}
-        </p>
-        <p>
-          <strong>Baseline:</strong> {summary.baseline_runtime}
-        </p>
-      </div>
-
-      <h3>Published runs</h3>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>Generated (UTC)</th>
-            <th>Suite</th>
-            <th>Run ID</th>
-            <th>Machine</th>
-            <th>Baseline</th>
-            <th>Policy</th>
-            <th>Mode</th>
-          </tr>
-        </thead>
-        <tbody>
-          {publishedRuns.map((run) => (
-            <tr key={`published-run-${run.file}`}>
-              <td>{run.generated_at_utc}</td>
-              <td>{run.suite}</td>
-              <td>{run.run_id}</td>
-              <td>{run.machine}</td>
-              <td>
-                <span className={run.cinderxBaselined ? styles.flagGood : styles.flagWarn}>
-                  {run.baselineRuntime}
-                </span>
-              </td>
-              <td>{run.policyEnforced ? 'enforced' : 'not-enforced'}</td>
-              <td>{run.ciMode ? 'ci-shape' : 'full'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
 
       {!cinderxBaseline ? (
         <p className={styles.warning}>
@@ -531,11 +757,30 @@ export default function BenchSummaryDashboard() {
         </p>
       ) : null}
 
+      <div className={styles.rowMeta}>
+        <p>
+          Showing {visibleCount} of {totalCount} benchmark rows
+          {benchmarkFilter ? ' after filter' : ''}.
+        </p>
+        {totalCount > BENCHMARK_DISPLAY_LIMIT ? (
+          <button
+            type="button"
+            className={styles.inlineButton}
+            onClick={() => setShowAllRows((value) => !value)}
+          >
+            {showAllRows ? 'Show top rows only' : `Show all ${totalCount} rows`}
+          </button>
+        ) : null}
+      </div>
+
       {viewMode === 'runtime' && cinderxBaseline ? (
         <>
-          <h3>Secondary runtime chart (non-headline)</h3>
+          <h3>
+            Secondary runtime chart ({runtimeLabel(summary, selectedRuntime)} vs{' '}
+            {runtimeLabel(summary, summary.baseline_runtime)})
+          </h3>
           <div className={styles.chart}>
-            {filteredRows.map((row) => {
+            {displayedRuntimeRows.map((row) => {
               const ratio = row.speedup_vs_baseline ?? 0;
               const width = `${Math.max((ratio / maxSpeedup) * 100, 3)}%`;
               return (
@@ -558,14 +803,14 @@ export default function BenchSummaryDashboard() {
                 <th>Workload</th>
                 <th>Mean (s)</th>
                 <th>Stdev (s)</th>
-                <th>Speedup vs selected baseline</th>
+                <th>Speedup vs baseline</th>
                 <th>p-value</th>
                 <th>RSS (max)</th>
                 <th>Compile time (s)</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map((row) => (
+              {displayedRuntimeRows.map((row) => (
                 <tr key={`runtime-row-${row.runtime}-${row.benchmark}`}>
                   <td>{row.benchmark}</td>
                   <td>{row.workload_class}</td>
@@ -589,11 +834,11 @@ export default function BenchSummaryDashboard() {
         </p>
       ) : (
         <>
-          <h3>CinderX vs {selectedComparisonRuntimeLabel} chart</h3>
+          <h3>CinderX vs {selectedComparisonRuntimeLabel}</h3>
           {canCompareVsCinderx ? (
             <>
               <div className={styles.chart}>
-                {cinderxComparisonRows.map((row) => {
+                {displayedCinderxRows.map((row) => {
                   const width = `${Math.max((row.cinderxSpeedup / cinderxComparisonMax) * 100, 3)}%`;
                   return (
                     <div key={`cinderx-compare-${row.benchmark}`} className={styles.chartRow}>
@@ -623,7 +868,7 @@ export default function BenchSummaryDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cinderxComparisonRows.map((row) => (
+                  {displayedCinderxRows.map((row) => (
                     <tr key={`cinderx-row-${row.benchmark}`}>
                       <td>{row.benchmark}</td>
                       <td>{row.workloadClass}</td>
@@ -654,7 +899,7 @@ export default function BenchSummaryDashboard() {
         </>
       )}
 
-      <h3>Runtime Startup (mean seconds)</h3>
+      <h3>Runtime startup (mean seconds)</h3>
       <table className={styles.table}>
         <thead>
           <tr>
@@ -680,6 +925,9 @@ export default function BenchSummaryDashboard() {
         <p className={styles.warning}>
           Skipped runtimes/tools: {summary.skipped_runtimes.join('; ')}
         </p>
+      ) : null}
+      {summary.limitations && summary.limitations.length > 0 ? (
+        <p className={styles.warning}>Run limitations: {summary.limitations.join('; ')}</p>
       ) : null}
       {error ? <p className={styles.warning}>{error}</p> : null}
     </section>

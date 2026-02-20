@@ -37,6 +37,23 @@ When a real CinderX runtime is available:
 CINDERX_PYTHON=/path/to/cinderx-python bash scripts/bench/run_quickstart_matrix.sh
 ```
 
+For full local pyperformance publication candidates:
+
+```bash
+CINDERX_PYTHON=/path/to/cinderx-python make bench-pyperformance-local-cinderx
+```
+
+Optional experimental bootstrap (feature-enablement trial):
+
+```bash
+cxc bench run \
+  --suite pyperformance \
+  --python /path/to/python3.14 \
+  --cpython-cinderx /path/to/cinderx-python \
+  --require-cinderx-baseline \
+  --pyperformance-bootstrap-inline "import cinderx; 'init' in dir(cinderx) and cinderx.init()"
+```
+
 Comparator support note:
 
 - `pyperformance` currently executes python-runtime adapters (CPython/CinderX/PyPy)
@@ -82,7 +99,15 @@ For published claims in this repo, only use runs that are:
 - `baseline_runtime = "cpython-cinderx"`
 - `metadata.run_config.require_cinderx_baseline = true`
 - `metadata.run_config.ci_mode = false` (full pyperformance)
+- `metadata.run_config.pyperformance_bootstrap_inline_enabled = false` unless explicitly part of the claim
 - accepted by `make bench-publish-check`
+
+Quick user-project script checks:
+
+```bash
+.venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/json_hot_path.py --iterations 4000 --payload-size 512
+```
 
 ## Troubleshooting
 

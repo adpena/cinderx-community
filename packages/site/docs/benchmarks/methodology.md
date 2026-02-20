@@ -28,6 +28,26 @@ Source: [pyperformance documentation](https://pyperformance.readthedocs.io/)
 - `--cpython-cinderx` is strictly validated; if the runtime does not expose CinderX (`import cinderx`),
   the run fails instead of labeling it as a CinderX baseline.
 
+## Experimental bootstrap for CinderX feature toggles
+
+For controlled experiments, pyperformance runs can inject inline Python via a temporary
+`sitecustomize` shim:
+
+```bash
+cxc bench run \
+  --suite pyperformance \
+  --python /path/to/python3.14 \
+  --cpython-cinderx /path/to/cinderx-python \
+  --require-cinderx-baseline \
+  --pyperformance-bootstrap-inline "import cinderx; 'init' in dir(cinderx) and cinderx.init()"
+```
+
+Notes:
+
+- This is experimental and intended for feature-enablement exploration, not default headline runs.
+- The dashboard surfaces bootstrap-enabled state and bootstrap hash for traceability.
+- Keep a non-bootstrap control run with identical machine/toolchain settings when making claims.
+
 Example smoke run with CinderX baseline plus interpreter comparison runtime:
 
 ```bash
@@ -84,3 +104,9 @@ Local benchmark publication is supported when you:
 - keep full metadata in the generated summaries
 - pass `cxc bench verify-publish --require-suite pyperformance`
 - export metadata dossiers with `cxc bench export-dossier` (or `make bench-dossier`) for report attachment
+
+## Near-term expansion track
+
+- Increase smoke-suite breadth with additional interpreter-heavy and serialization-heavy toy workloads.
+- Add targeted pyperformance slices for tutorial demos, while keeping full-suite runs canonical for publishing.
+- Add tutorial-backed app-shaped scripts so users can reproduce CPython vs CinderX comparisons quickly.

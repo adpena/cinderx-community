@@ -12,6 +12,7 @@ Current status:
 - `pyperformance` (implemented adapter): `cxc bench run --suite pyperformance ...` (interpreter comparators only: CPython/CinderX/PyPy; canonical published results are full pyperformance runs)
 - Numba ASV-style benchmarks (future standalone suite; not a pyperformance comparator path)
 - Real application workloads (to be defined with reproducibility checklists)
+- Roadmap benchmark additions (next): expand smoke toy workloads, add tutorial-facing pyperformance slices, and add app-shaped scripts that map directly to CinderX user workflows
 
 Source baseline for methodology: [pyperformance docs](https://pyperformance.readthedocs.io/)
 
@@ -20,4 +21,5 @@ Source baseline for methodology: [pyperformance docs](https://pyperformance.read
 Smoke is debug-focused and not part of canonical published headline results.
 Use `--require-cinderx-baseline` for comparison publishing policy enforcement.
 Provided `--cpython-cinderx` runtimes are validated and rejected if they do not expose CinderX.
+Optional pyperformance bootstrap inline hooks are available for controlled feature-enablement experiments.
 :::

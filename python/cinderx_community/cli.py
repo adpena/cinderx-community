@@ -206,6 +206,15 @@ def bench_run(
         Path | None,
         typer.Option(file_okay=True, dir_okay=False, help="Optional PyPy executable."),
     ] = None,
+    pyperformance_bootstrap_inline: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Optional inline Python executed via a temporary sitecustomize shim for "
+                "pyperformance runs (experimental). Useful for CinderX feature bootstrap trials."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Run benchmark suites or print execution plans for not-yet-automated suites."""
     runnable_suites = {SMOKE_SUITE, PYPERFORMANCE_SUITE}
@@ -244,6 +253,7 @@ def bench_run(
                 cpython_cinderx=cpython_cinderx,
                 pypy=pypy,
                 static_summary_root=static_summary_out,
+                pyperformance_bootstrap_inline=pyperformance_bootstrap_inline,
             )
     except ValueError as exc:
         typer.echo(str(exc), err=True)

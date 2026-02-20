@@ -13,6 +13,7 @@ artifacts that mirror published data flow.
 - one pyperformance summary JSON (CI-mode subset)
 - one metadata dossier JSON
 - comparator wiring visibility (PyPy detection)
+- two hands-on scripts you can run against CPython vs CinderX in your own project loop
 - a clear next step for publishable CinderX-baselined runs
 
 ## Prerequisites
@@ -99,3 +100,21 @@ cd python
   --static-summary-root ../packages/site/static/data/summary \
   --require-suite pyperformance
 ```
+
+## 7) Run practical CPython vs CinderX scripts
+
+Runtime identity report:
+
+```bash
+.venv/bin/python scripts/tutorials/runtime_identity_report.py
+$CINDERX_PYTHON scripts/tutorials/runtime_identity_report.py
+```
+
+Small JSON hot-path workload:
+
+```bash
+.venv/bin/python scripts/tutorials/json_hot_path.py --iterations 4000 --payload-size 512
+$CINDERX_PYTHON scripts/tutorials/json_hot_path.py --iterations 4000 --payload-size 512
+```
+
+This gives a concrete app-like loop you can copy into service-level experiments.

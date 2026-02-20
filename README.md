@@ -193,6 +193,8 @@ Script-first helpers are also available:
 bash scripts/bench/install_comparison_toolchain.sh
 bash scripts/bench/run_quickstart_matrix.sh
 bash scripts/bench/sync_site_data_from_bench_results.sh
+.venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/json_hot_path.py --iterations 4000 --payload-size 512
 ```
 
 Equivalent make wrappers:
@@ -217,6 +219,18 @@ Or run the wired target directly:
 
 ```bash
 make bench-publish-check
+```
+
+Experimental pyperformance bootstrap (feature-enablement trials):
+
+```bash
+cd python
+../.venv/bin/cxc bench run \
+  --suite pyperformance \
+  --python ../.venv/bin/python \
+  --cpython-cinderx /path/to/cinderx-python \
+  --require-cinderx-baseline \
+  --pyperformance-bootstrap-inline "import cinderx; getattr(cinderx, 'init', lambda: None)()"
 ```
 
 You can run publishable benchmarks locally (no self-hosted CI required) as long as the run is
