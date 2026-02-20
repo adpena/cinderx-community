@@ -9,7 +9,7 @@ VENV_STAMP := $(VENV_DIR)/.ready
 SUMMARY_DIR := data/summary
 STATIC_SUMMARY_DIR := packages/site/static/data/summary
 
-.PHONY: dev fmt lint test build clean python-dev python-dev-cinderx cinderx-env-check cinderx-install-local cinderx-install-local-macos bench-toolchain bench-toolchain-compare bench-smoke-local bench-smoke-local-cinderx bench-pyperformance-local bench-pyperformance-local-cinderx bench-publish-check bench-publish-check-smoke bench-dossier bench-dossier-smoke bench-run-quickstart-matrix bench-sync-site-data
+.PHONY: dev fmt lint test build clean python-dev python-dev-cinderx cinderx-env-check cinderx-install-local cinderx-install-local-macos bench-toolchain bench-toolchain-compare bench-smoke-local bench-smoke-local-cinderx bench-pyperformance-local bench-pyperformance-local-cinderx bench-pyperformance-local-ci bench-pyperformance-local-cinderx-ci bench-publish-check bench-publish-check-smoke bench-dossier bench-dossier-smoke bench-run-quickstart-matrix bench-sync-site-data
 
 $(VENV_STAMP): $(PY_DIR)/pyproject.toml
 	$(UV) python install $(PYTHON_VERSION)
@@ -81,9 +81,16 @@ bench-smoke-local-cinderx: python-dev
 	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench run --suite smoke --python ../$(VENV_DIR)/bin/python --cpython-cinderx "$(CINDERX_PYTHON)" --require-cinderx-baseline --out ../data/runs --summary-out ../$(SUMMARY_DIR) --static-summary-out ../$(STATIC_SUMMARY_DIR)
 
 bench-pyperformance-local: bench-toolchain
-	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench run --suite pyperformance --python ../$(VENV_DIR)/bin/python --ci-mode --out ../data/runs --summary-out ../$(SUMMARY_DIR) --static-summary-out ../$(STATIC_SUMMARY_DIR)
+	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench run --suite pyperformance --python ../$(VENV_DIR)/bin/python --out ../data/runs --summary-out ../$(SUMMARY_DIR) --static-summary-out ../$(STATIC_SUMMARY_DIR)
 
 bench-pyperformance-local-cinderx: bench-toolchain
+	@if [ -z "$(CINDERX_PYTHON)" ]; then echo "Set CINDERX_PYTHON=/path/to/cinderx-python"; exit 2; fi
+	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench run --suite pyperformance --python ../$(VENV_DIR)/bin/python --cpython-cinderx "$(CINDERX_PYTHON)" --require-cinderx-baseline --out ../data/runs --summary-out ../$(SUMMARY_DIR) --static-summary-out ../$(STATIC_SUMMARY_DIR)
+
+bench-pyperformance-local-ci: bench-toolchain
+	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench run --suite pyperformance --python ../$(VENV_DIR)/bin/python --ci-mode --out ../data/runs --summary-out ../$(SUMMARY_DIR) --static-summary-out ../$(STATIC_SUMMARY_DIR)
+
+bench-pyperformance-local-cinderx-ci: bench-toolchain
 	@if [ -z "$(CINDERX_PYTHON)" ]; then echo "Set CINDERX_PYTHON=/path/to/cinderx-python"; exit 2; fi
 	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench run --suite pyperformance --python ../$(VENV_DIR)/bin/python --cpython-cinderx "$(CINDERX_PYTHON)" --require-cinderx-baseline --ci-mode --out ../data/runs --summary-out ../$(SUMMARY_DIR) --static-summary-out ../$(STATIC_SUMMARY_DIR)
 

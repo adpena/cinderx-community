@@ -54,6 +54,13 @@ For a publishable-policy run when a real CinderX runtime is available:
 CINDERX_PYTHON=/path/to/cinderx-python bash scripts/bench/run_quickstart_matrix.sh
 ```
 
+For full local pyperformance (non-`ci_mode`) on your laptop, use:
+
+```bash
+make bench-pyperformance-local
+CINDERX_PYTHON=/path/to/cinderx-python make bench-pyperformance-local-cinderx
+```
+
 ## 4) Inspect latest summaries and runtime coverage
 
 ```bash

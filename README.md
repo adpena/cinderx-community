@@ -180,6 +180,13 @@ CINDERX_PYTHON=/path/to/cinderx-python make bench-smoke-local-cinderx
 CINDERX_PYTHON=/path/to/cinderx-python make bench-pyperformance-local-cinderx
 ```
 
+`bench-pyperformance-local*` targets run full pyperformance by default. For fast debug-only subsets:
+
+```bash
+make bench-pyperformance-local-ci
+CINDERX_PYTHON=/path/to/cinderx-python make bench-pyperformance-local-cinderx-ci
+```
+
 Script-first helpers are also available:
 
 ```bash
