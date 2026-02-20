@@ -5,6 +5,7 @@ Community-run monorepo for documentation, compatibility guidance, and benchmarki
 Project owner: Alejandro Pena (GitHub: [@adpena](https://github.com/adpena)).
 
 This repository is intentionally scoped for open collaboration:
+
 - A polished docs website (Docusaurus, static, GitHub Pages ready)
 - Python CLI for upstream pinning, introspection extraction, and benchmark orchestration
 - Contributor-first automation (lint, tests, CI, issue templates)
@@ -12,6 +13,7 @@ This repository is intentionally scoped for open collaboration:
 ## Scope and Source Policy
 
 Documentation in this repo is grounded in these sources:
+
 - CinderX README: https://github.com/facebookincubator/cinderx
 - Meta engineering post on CPython 3.12 hooks: https://engineering.fb.com/2023/10/05/developer-tools/python-312-meta-new-features/
 - pyperformance docs: https://pyperformance.readthedocs.io/
@@ -30,6 +32,7 @@ question/hypothesis.
 ## Quickstart
 
 Requirements:
+
 - Node.js 22+
 - Python 3.14+
 - `uv` (Python/runtime/package manager)
@@ -38,9 +41,12 @@ Requirements:
 ```bash
 uv python install 3.14
 uv venv --python 3.14 .venv
-uv pip install --python .venv/bin/python -e ./python[dev]
+corepack enable
+pnpm -C packages/site install
+make python-dev  # install Python tooling into .venv
 uv add --project ./python --optional cinderx cinderx --no-sync
 make dev      # run docs locally
+make fmt      # format JS/TS/MD(X) + Python
 make lint     # lint JS/TS + Python
 make test     # run Python tests
 make build    # produce static docs build
@@ -48,9 +54,24 @@ make build    # produce static docs build
 
 Docs live in `packages/site/docs` and the homepage lives in `packages/site/src/pages/index.tsx`.
 
+Python/runtime dependency management in this repo is `uv`-only (`uv python`, `uv venv`, `uv add`,
+`uv pip install`).
+
+## Common Make Targets
+
+- `make python-dev`: provision `.venv` and install `python[dev]`
+- `make python-dev-cinderx`: install `python[dev,cinderx]` into `.venv`
+- `make dev`: run the docs site locally on port `3000`
+- `make fmt`: format web/docs files and Python
+- `make lint`: TypeScript/Prettier/cspell + Ruff checks
+- `make test`: run `pytest` under `python/cinderx_community/tests`
+- `make build`: create the static docs site (`packages/site/build`)
+- `make clean`: remove local build/cache/venv artifacts
+
 ## Upstream Tracking (Latest CinderX)
 
 The Python CLI tracks upstream provenance and snapshots:
+
 - Sync/clone upstream repo to local cache
 - Pin provenance in `python/cinderx_community/pins.toml`
 - Record commit snapshots over time in `.cache/upstream/history/`
@@ -60,12 +81,11 @@ Example:
 ```bash
 uv python install 3.14
 uv venv --python 3.14 .venv
-uv pip install --python .venv/bin/python -e ./python[dev]
-cd python
-../.venv/bin/cxc upstream clone --repo cinderx --dest .cache/upstream/cinderx
-../.venv/bin/cxc upstream pin --repo cinderx --dest .cache/upstream/cinderx --tag phase-2
-../.venv/bin/cxc upstream status
-../.venv/bin/cxc upstream history --repo cinderx
+make python-dev
+.venv/bin/cxc upstream clone --repo cinderx --dest .cache/upstream/cinderx
+.venv/bin/cxc upstream pin --repo cinderx --dest .cache/upstream/cinderx --tag phase-2
+.venv/bin/cxc upstream status --dest .cache/upstream/cinderx
+.venv/bin/cxc upstream history --repo cinderx
 ```
 
 ## Phase 2 Introspection Pipeline
@@ -134,7 +154,7 @@ baseline in `smoke`.
 Install benchmark toolchain extras with:
 
 ```bash
-uv pip install --python .venv/bin/python pyperformance
+make bench-toolchain
 ```
 
 To install the optional package metadata path for CinderX in this project:
@@ -163,6 +183,12 @@ If you hit the macOS arm64 `fmt` compile failure, use the workaround path:
 
 ```bash
 make cinderx-install-local-macos
+```
+
+For CI-parity staged install + import probe diagnostics:
+
+```bash
+bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode permissive
 ```
 
 Equivalent direct command:
@@ -197,9 +223,10 @@ bash scripts/bench/sync_site_data_from_bench_results.sh
 .venv/bin/python scripts/tutorials/json_hot_path.py --iterations 4000 --payload-size 512
 ```
 
-Equivalent make wrappers:
+Equivalent wrapper targets:
 
 ```bash
+make bench-toolchain
 make bench-toolchain-compare
 make bench-run-quickstart-matrix
 make bench-sync-site-data
@@ -230,7 +257,7 @@ cd python
   --python ../.venv/bin/python \
   --cpython-cinderx /path/to/cinderx-python \
   --require-cinderx-baseline \
-  --pyperformance-bootstrap-inline "import cinderx; getattr(cinderx, 'init', lambda: None)()"
+  --pyperformance-bootstrap-inline "import cinderx; 'init' in dir(cinderx) and cinderx.init()"
 ```
 
 You can run publishable benchmarks locally (no self-hosted CI required) as long as the run is
@@ -242,6 +269,12 @@ cd python
   --summary-root ../data/summary \
   --static-summary-root ../packages/site/static/data/summary \
   --require-suite pyperformance
+```
+
+Optional smoke-only guard (debug validation):
+
+```bash
+make bench-publish-check-smoke
 ```
 
 To include configuration details in reports, export metadata snapshots:
@@ -256,6 +289,7 @@ Or use the wired dossier command/targets:
 cd python
 ../.venv/bin/cxc bench export-dossier --summary-root ../data/summary --output-root ../data/summary/reports --require-suite pyperformance
 make bench-dossier
+make bench-dossier-smoke
 ```
 
 ## Development Notes
