@@ -13,7 +13,8 @@ This page renders benchmark summaries published under `data/summary/*.json` and 
 
 - Each run publishes one JSON summary with links to raw runtime artifacts.
 - Every summary includes provenance (`run_id`, commit SHA, machine, and suite metadata).
-- Dashboard cards expose benchmark counts, runtime coverage, publishability mode, and bootstrap flags.
+- Dashboard cards expose benchmark counts, runtime coverage, publishability mode, bootstrap flags,
+  and CinderX feature activation details (JIT mode/threshold + static-loader state).
 - Machine profile, toolchain provenance, and guardrail checks are shown inline for each selected run.
 - Speedups are always calculated against the baseline from the same run.
 - Headline publishing is CinderX-first: only pinned CinderX-baselined `pyperformance` runs are canonical; other lanes are diagnostics.

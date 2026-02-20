@@ -106,6 +106,19 @@ Historical note: earlier run `22196352820` had an `import cinderx` crash on `ubu
 (exit `139`). Keep diagnostics artifacts enabled because hosted-runner image/toolchain drift can
 reintroduce regressions.
 
+Additional hosted-runner caveat seen on 2026-02-20:
+
+- `import cinderx` passed, but strict/static loader failed with
+  `Strict module stubs path does not exist: .../site-packages/cinderx/compiler/strict/stubs`.
+- Root cause: some wheels do not include `compiler/strict/stubs` package data.
+
+CI mitigation in this repo:
+
+- `scripts/ci/install_and_probe_cinderx.sh --require-static-loader` now resolves a strict stubs
+  path (site-packages first, upstream sparse checkout fallback) and runs a fast strict/static probe.
+- Bench preflight/run steps set `PYTHONSTRICTMODULESTUBSPATH` from the installer output, so
+  `cinderx-all-features` can install strict loader on Linux when wheel stubs are absent.
+
 ## Publishability guardrail
 
 `cxc bench verify-publish` requires:

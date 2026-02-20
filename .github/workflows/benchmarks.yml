@@ -149,6 +149,7 @@ jobs:
           bash scripts/ci/install_and_probe_cinderx.sh \
             --python .venv/bin/python \
             --mode strict \
+            --require-static-loader \
             --diagnostics-dir .cache/cinderx-diagnostics
 
       - name: Upload pinned-runner CinderX diagnostics
@@ -164,7 +165,19 @@ jobs:
           rm -rf data/runs data/summary packages/site/static/data/summary
           mkdir -p data/runs data/summary packages/site/static/data/summary
 
+      - name: Preflight pyperformance bootstrap (fast fail)
+        env:
+          PYTHONSTRICTMODULESTUBSPATH: ${{ steps.cinderx_strict.outputs.strict_stubs_path }}
+        run: |
+          .venv/bin/cxc bench preflight-pyperformance \
+            --python "${{ steps.cinderx_strict.outputs.python_bin }}" \
+            --cpython-cinderx "${{ steps.cinderx_strict.outputs.cinderx_bin }}" \
+            --require-cinderx-baseline \
+            --timeout-seconds 90
+
       - name: Run pyperformance suite (publishable full)
+        env:
+          PYTHONSTRICTMODULESTUBSPATH: ${{ steps.cinderx_strict.outputs.strict_stubs_path }}
         run: |
           .venv/bin/cxc bench run \
             --suite pyperformance \

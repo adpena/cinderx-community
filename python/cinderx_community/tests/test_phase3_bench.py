@@ -394,7 +394,35 @@ def test_resolve_pyperformance_bootstrap_profile_all_features() -> None:
     assert threshold is None
     assert inline_code is not None
     assert "cinderx.jit" in inline_code
+    assert "strict_stubs_dir" in inline_code
+    assert "PYTHONSTRICTMODULESTUBSPATH" in inline_code
+    assert "Strict module stubs path does not exist" in inline_code
     assert "strict_loader.install(enable_patching=True)" in inline_code
+
+
+def test_describe_cinderx_pyperformance_features_all_features() -> None:
+    features = runner._describe_cinderx_pyperformance_features(
+        resolved_bootstrap_profile="cinderx-all-features",
+        bootstrap_inline_sha256="abc123",
+        resolved_bootstrap_jit_compile_after_n_calls=None,
+    )
+    assert features["profile"] == "cinderx-all-features"
+    assert features["jit_mode"] == "auto"
+    assert features["static_loader_enabled"] is True
+    assert features["static_loader_enable_patching"] is True
+    assert features["summary"] == "JIT auto + static loader (patching)"
+
+
+def test_describe_cinderx_pyperformance_features_custom_inline() -> None:
+    features = runner._describe_cinderx_pyperformance_features(
+        resolved_bootstrap_profile=None,
+        bootstrap_inline_sha256="deadbeef",
+        resolved_bootstrap_jit_compile_after_n_calls=None,
+    )
+    assert features["profile"] == "custom-inline"
+    assert features["jit_mode"] is None
+    assert features["static_loader_enabled"] is None
+    assert features["static_loader_enable_patching"] is None
 
 
 def test_resolve_pyperformance_bootstrap_rejects_profile_inline_conflict() -> None:
@@ -508,6 +536,92 @@ def test_run_pyperformance_suite_records_bootstrap_profile_metadata(
         "compile_after_n_calls(7)"
         in observed_env_by_runtime_key["cpython"]["CXC_PYPERF_BOOTSTRAP_INLINE"]
     )
+
+
+def test_preflight_pyperformance_uses_cinderx_runtime_with_auto_profile(
+    tmp_path: Path, monkeypatch
+) -> None:
+    cpython_link = tmp_path / "cpython-runtime"
+    cpython_link.symlink_to(Path(sys.executable))
+    cinderx_link = tmp_path / "cpython-cinderx-runtime"
+    cinderx_link.symlink_to(Path(sys.executable))
+
+    monkeypatch.setattr(runner, "_runtime_has_cinderx_support", lambda _executable: True)
+
+    observed_commands: list[list[str]] = []
+    observed_env_by_command: list[dict[str, str]] = []
+    original_run_command = runner._run_command
+
+    def fake_run_command(
+        args: list[str],
+        *,
+        timeout_s: int = 90,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        if len(args) >= 3 and args[1] == "-m" and args[2] == "pyperformance":
+            observed_commands.append(list(args))
+            observed_env_by_command.append(dict(env or {}))
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="ok", stderr="")
+        return original_run_command(args, timeout_s=timeout_s, env=env)
+
+    monkeypatch.setattr(runner, "_run_command", fake_run_command)
+
+    result = runner.preflight_pyperformance_suite(
+        python=cpython_link,
+        cpython_cinderx=cinderx_link,
+        require_cinderx_baseline=True,
+        timeout_seconds=10,
+    )
+
+    assert result.runtime == "cpython-cinderx"
+    assert result.bootstrap_profile == runner.AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE
+    assert result.bootstrap_profile_source == "auto-default"
+    assert result.bootstrap_target_runtime_key == "cpython-cinderx"
+    assert any(command[-1] == "--help" for command in observed_commands)
+    assert any("run" in command for command in observed_commands)
+    assert observed_env_by_command
+    assert all(
+        env.get("CXC_PYPERF_RUNTIME_KEY") == "cpython-cinderx" for env in observed_env_by_command
+    )
+    assert all(
+        env.get("CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY") == "cpython-cinderx"
+        for env in observed_env_by_command
+    )
+
+
+def test_preflight_pyperformance_fails_fast_on_launcher_error(tmp_path: Path, monkeypatch) -> None:
+    cpython_link = tmp_path / "cpython-runtime"
+    cpython_link.symlink_to(Path(sys.executable))
+    cinderx_link = tmp_path / "cpython-cinderx-runtime"
+    cinderx_link.symlink_to(Path(sys.executable))
+
+    monkeypatch.setattr(runner, "_runtime_has_cinderx_support", lambda _executable: True)
+
+    def fake_run_command(
+        args: list[str],
+        *,
+        timeout_s: int = 90,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        if len(args) >= 3 and args[1] == "-m" and args[2] == "pyperformance":
+            raise ValueError("simulated pyperformance bootstrap break")
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(runner, "_run_command", fake_run_command)
+
+    try:
+        runner.preflight_pyperformance_suite(
+            python=cpython_link,
+            cpython_cinderx=cinderx_link,
+            require_cinderx_baseline=True,
+            timeout_seconds=10,
+        )
+    except ValueError as exc:
+        assert "Preflight failed for pyperformance bootstrap on runtime 'cpython-cinderx'" in str(
+            exc
+        )
+    else:
+        raise AssertionError("Expected pyperformance preflight failure")
 
 
 def test_run_pyperformance_suite_without_cinderx_keeps_bootstrap_disabled(

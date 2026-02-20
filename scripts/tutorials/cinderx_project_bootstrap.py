@@ -6,6 +6,9 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import os
+import pathlib
+import sys
 from typing import Any
 
 DEFAULT_JIT_COMPILE_AFTER_N_CALLS = 40000
@@ -62,6 +65,8 @@ def apply_bootstrap(args: argparse.Namespace) -> dict[str, Any]:
         "jit_compile_after_n_calls": None,
         "jit_is_enabled": None,
         "static_loader_installed": False,
+        "strict_stubs_path": None,
+        "strict_stubs_exists": None,
     }
 
     if args.jit_compile_after_n_calls <= 0:
@@ -76,6 +81,24 @@ def apply_bootstrap(args: argparse.Namespace) -> dict[str, Any]:
 
     report["cinderx_available"] = True
     report["cinderx_module_path"] = getattr(cinderx, "__file__", None)
+    strict_stubs_path: str | None = None
+    configured_stub_path = (
+        (getattr(sys, "_xoptions", {}) or {}).get("strict-module-stubs-path")
+        or os.environ.get("PYTHONSTRICTMODULESTUBSPATH")
+    )
+    if configured_stub_path:
+        strict_stubs_path = str(pathlib.Path(configured_stub_path).expanduser())
+    elif report["cinderx_module_path"]:
+        strict_stubs_path = str(
+            pathlib.Path(str(report["cinderx_module_path"])).resolve().parent
+            / "compiler"
+            / "strict"
+            / "stubs"
+        )
+    report["strict_stubs_path"] = strict_stubs_path
+    report["strict_stubs_exists"] = bool(
+        strict_stubs_path and pathlib.Path(strict_stubs_path).exists()
+    )
 
     if hasattr(cinderx, "init"):
         _safe_call(cinderx.init)
@@ -124,6 +147,11 @@ def apply_bootstrap(args: argparse.Namespace) -> dict[str, Any]:
         )
 
     if args.install_static_loader:
+        if not report["strict_stubs_exists"]:
+            report["warnings"].append(
+                "strict stubs path is missing; static loader install may fail. "
+                "Set PYTHONSTRICTMODULESTUBSPATH to a valid strict stubs directory."
+            )
         try:
             strict_loader = importlib.import_module("cinderx.compiler.strict.loader")
         except Exception as exc:

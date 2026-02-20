@@ -15,6 +15,7 @@ from cinderx_community.bench.runner import (
     build_plan,
     export_metadata_dossiers,
     list_suites,
+    preflight_pyperformance_suite,
     run_pyperformance_suite,
     run_smoke_suite,
     verify_publishable_summaries,
@@ -286,6 +287,80 @@ def bench_run(
         raise typer.Exit(code=2) from exc
 
     typer.echo(bench_to_json(run_result))
+
+
+@bench_app.command("preflight-pyperformance")
+def bench_preflight_pyperformance(
+    python: Annotated[
+        Path,
+        typer.Option(exists=True, file_okay=True, dir_okay=False, help="Python executable"),
+    ] = ...,
+    cpython_cinderx: Annotated[
+        Path | None,
+        typer.Option(
+            "--cpython-cinderx",
+            file_okay=True,
+            dir_okay=False,
+            help="Optional Python executable with CinderX enabled.",
+        ),
+    ] = None,
+    require_cinderx_baseline: Annotated[
+        bool,
+        typer.Option(
+            help="Require CinderX baseline runtime availability for preflight checks.",
+        ),
+    ] = False,
+    pyperformance_bootstrap_inline: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Optional inline Python executed via a temporary sitecustomize shim for "
+                "pyperformance preflight."
+            ),
+        ),
+    ] = None,
+    pyperformance_bootstrap_profile: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Named pyperformance bootstrap profile for preflight. Supported values: "
+                + ", ".join(PYPERFORMANCE_BOOTSTRAP_PROFILES)
+            ),
+        ),
+    ] = None,
+    pyperformance_bootstrap_jit_compile_after_n_calls: Annotated[
+        int | None,
+        typer.Option(
+            min=1,
+            help=(
+                "JIT compile-after-n-calls threshold for "
+                "--pyperformance-bootstrap-profile=cinderx-jit-compile-after-n-calls."
+            ),
+        ),
+    ] = None,
+    timeout_seconds: Annotated[
+        int,
+        typer.Option(min=1, help="Command timeout for each pyperformance preflight check."),
+    ] = 45,
+) -> None:
+    """Run a fast pyperformance launcher/bootstrap preflight before full benchmark execution."""
+    try:
+        result = preflight_pyperformance_suite(
+            python=python,
+            cpython_cinderx=cpython_cinderx,
+            require_cinderx_baseline=require_cinderx_baseline,
+            pyperformance_bootstrap_inline=pyperformance_bootstrap_inline,
+            pyperformance_bootstrap_profile=pyperformance_bootstrap_profile,
+            pyperformance_bootstrap_jit_compile_after_n_calls=(
+                pyperformance_bootstrap_jit_compile_after_n_calls
+            ),
+            timeout_seconds=timeout_seconds,
+        )
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo(bench_to_json(result))
 
 
 @bench_app.command("verify-publish")

@@ -66,6 +66,12 @@ type SummaryMetadata = {
     pyperformance_bootstrap_profile_source?: string | null;
     pyperformance_bootstrap_jit_compile_after_n_calls?: number | null;
     pyperformance_bootstrap_target_runtime_key?: string | null;
+    pyperformance_cinderx_feature_profile?: string | null;
+    pyperformance_cinderx_feature_summary?: string | null;
+    pyperformance_cinderx_jit_mode?: string | null;
+    pyperformance_cinderx_jit_compile_after_n_calls?: number | null;
+    pyperformance_cinderx_static_loader_enabled?: boolean | null;
+    pyperformance_cinderx_static_loader_enable_patching?: boolean | null;
   };
   toolchain?: {
     benchmark_repo_sha?: string;
@@ -111,6 +117,9 @@ type PublishedRunRow = SummaryIndexEntry & {
   executedRuntimes: number;
   pyperformanceMode: string;
   bootstrapEnabled: boolean;
+  cinderxFeatureSummary: string;
+  cinderxJitMode: string;
+  cinderxStaticLoader: string;
 };
 
 type ViewMode = 'runtime' | 'vs-cinderx';
@@ -189,6 +198,19 @@ function asBadgeMode(ciMode: boolean, pyperformanceMode?: string): string {
   return 'full';
 }
 
+function formatStaticLoaderState(
+  enabled: boolean | null | undefined,
+  patching: boolean | null | undefined
+): string {
+  if (enabled === true) {
+    return patching === true ? 'enabled (patching)' : 'enabled';
+  }
+  if (enabled === false) {
+    return 'disabled';
+  }
+  return 'unknown';
+}
+
 export default function BenchSummaryDashboard() {
   const indexUrl = useBaseUrl('/data/summary/index.json');
   const summaryBaseUrl = useBaseUrl('/data/summary/');
@@ -257,6 +279,10 @@ export default function BenchSummaryDashboard() {
           const runConfig = payload.metadata?.run_config;
           const policyEnforced = Boolean(runConfig?.require_cinderx_baseline);
           const ciMode = Boolean(runConfig?.ci_mode);
+          const cinderxStaticLoader = formatStaticLoaderState(
+            runConfig?.pyperformance_cinderx_static_loader_enabled,
+            runConfig?.pyperformance_cinderx_static_loader_enable_patching
+          );
           return {
             ...entry,
             baselineRuntime,
@@ -266,7 +292,10 @@ export default function BenchSummaryDashboard() {
             benchmarkCount: payload.benchmarks.length,
             executedRuntimes: payload.runtimes.filter((item) => item.executed).length,
             pyperformanceMode: runConfig?.pyperformance_mode ?? 'default',
-            bootstrapEnabled: Boolean(runConfig?.pyperformance_bootstrap_inline_enabled)
+            bootstrapEnabled: Boolean(runConfig?.pyperformance_bootstrap_inline_enabled),
+            cinderxFeatureSummary: runConfig?.pyperformance_cinderx_feature_summary ?? 'n/a',
+            cinderxJitMode: runConfig?.pyperformance_cinderx_jit_mode ?? 'unknown',
+            cinderxStaticLoader
           } satisfies PublishedRunRow;
         } catch {
           return {
@@ -278,7 +307,10 @@ export default function BenchSummaryDashboard() {
             benchmarkCount: 0,
             executedRuntimes: 0,
             pyperformanceMode: 'unknown',
-            bootstrapEnabled: false
+            bootstrapEnabled: false,
+            cinderxFeatureSummary: 'unknown',
+            cinderxJitMode: 'unknown',
+            cinderxStaticLoader: 'unknown'
           } satisfies PublishedRunRow;
         }
       })
@@ -376,6 +408,16 @@ export default function BenchSummaryDashboard() {
     : bootstrapProfileSource === 'auto-default'
       ? styles.badgeGood
       : styles.badgeWarn;
+  const cinderxFeatureSummary = runConfig?.pyperformance_cinderx_feature_summary ?? 'unknown';
+  const cinderxJitMode = runConfig?.pyperformance_cinderx_jit_mode ?? 'unknown';
+  const cinderxJitThreshold =
+    runConfig?.pyperformance_cinderx_jit_compile_after_n_calls ??
+    runConfig?.pyperformance_bootstrap_jit_compile_after_n_calls ??
+    null;
+  const cinderxStaticLoader = formatStaticLoaderState(
+    runConfig?.pyperformance_cinderx_static_loader_enabled,
+    runConfig?.pyperformance_cinderx_static_loader_enable_patching
+  );
 
   const workloadOptions = useMemo(() => {
     if (!summary) {
@@ -549,9 +591,11 @@ export default function BenchSummaryDashboard() {
             <li>Samples per benchmark: {runConfig?.samples ?? 'n/a'}</li>
             <li>Warmups per benchmark: {runConfig?.warmups ?? 'n/a'}</li>
             <li>
-              Bootstrap JIT threshold:{' '}
-              {runConfig?.pyperformance_bootstrap_jit_compile_after_n_calls ?? 'n/a'}
+              CinderX lane features: <strong>{cinderxFeatureSummary}</strong>
             </li>
+            <li>CinderX lane JIT mode: {cinderxJitMode}</li>
+            <li>CinderX lane static loader: {cinderxStaticLoader}</li>
+            <li>CinderX lane JIT threshold: {cinderxJitThreshold ?? 'n/a'}</li>
             <li>Bootstrap profile source: {bootstrapProfileSource}</li>
             <li>
               Bootstrap target runtime:{' '}
@@ -644,6 +688,7 @@ export default function BenchSummaryDashboard() {
               <th>Benchmarks</th>
               <th>Runtimes</th>
               <th>Baseline</th>
+              <th>CinderX features</th>
               <th>Mode</th>
               <th>Policy</th>
             </tr>
@@ -660,6 +705,13 @@ export default function BenchSummaryDashboard() {
                 <td>
                   <span className={run.cinderxBaselined ? styles.flagGood : styles.flagWarn}>
                     {run.baselineRuntime}
+                  </span>
+                </td>
+                <td>
+                  <span className={styles.historyFeature}>{run.cinderxFeatureSummary}</span>
+                  <br />
+                  <span className={styles.historyFeatureMeta}>
+                    JIT: {run.cinderxJitMode} | Static: {run.cinderxStaticLoader}
                   </span>
                 </td>
                 <td>{asBadgeMode(run.ciMode, run.pyperformanceMode)}</td>

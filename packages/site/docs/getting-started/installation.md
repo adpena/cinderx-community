@@ -39,6 +39,25 @@ Separate runtime caveat: install may succeed while `_cinderx.so` fails symbol re
 time (`get_import_error()` reports missing `__ZNSt3__113__hash_memoryEPKvm`), which disables JIT
 and static-loader hooks.
 
+## Troubleshooting (Linux strict/static loader)
+
+If benchmark bootstrap (or explicit strict loader install) fails with:
+
+`Strict module stubs path does not exist: .../cinderx/compiler/strict/stubs`
+
+your installed wheel likely omitted strict-module stubs data. In this repo, run:
+
+```bash
+bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode strict --require-static-loader
+```
+
+The script resolves a usable stubs path and reports it as `strict_stubs_path`. Export it before
+benchmark runs:
+
+```bash
+export PYTHONSTRICTMODULESTUBSPATH="/path/from/strict_stubs_path"
+```
+
 ## Verify import only
 
 ```python

@@ -19,6 +19,7 @@ Repo-level governance and automation live in `.github/`, `README.md`, `CONTRIBUT
 - `make cinderx-install-local`: attempt local CinderX install into `.venv` (`--no-build-isolation`).
 - `make cinderx-install-local-macos`: macOS arm64 fallback install path for upstream `fmt` header failures during local `cinderx` source build.
 - `bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode permissive`: staged CinderX install + import probe + diagnostics capture (CI parity path).
+- `bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode strict --require-static-loader`: strict CI gate that also validates strict/static loader viability and resolves `strict/stubs` fallback path when wheel packaging omits it.
 - `make bench-toolchain`: install local benchmark dependencies (`pyperformance`).
 - `make bench-smoke-local`: run local smoke suite in CI-shape mode.
 - `make bench-pyperformance-local`: run local full pyperformance suite.
@@ -59,6 +60,9 @@ uv pip install --python .venv/bin/python pyperformance
   - `PYTHONPATH=src` does not affect this native build failure mode.
   - Runtime caveat:
     - If `import cinderx` succeeds but `get_import_error()` reports missing symbol `__ZNSt3__113__hash_memoryEPKvm`, treat the runtime as non-CinderX-capable for JIT/static benchmarking and gather diagnostics with `bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode permissive`.
+  - Linux/static loader caveat:
+    - Some CinderX wheels can omit `cinderx/compiler/strict/stubs`, which causes `Strict module stubs path does not exist` when strict/static loader is installed.
+    - Use `scripts/ci/install_and_probe_cinderx.sh` to resolve a fallback stubs path and export `strict_stubs_path`; benchmark steps should pass it via `PYTHONSTRICTMODULESTUBSPATH`.
 
 ## Coding Style & Naming Conventions
 - Follow `.editorconfig`: UTF-8, LF, trailing whitespace trimmed, final newline.

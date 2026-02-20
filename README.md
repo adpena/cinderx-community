@@ -194,6 +194,18 @@ For CI-parity staged install + import probe diagnostics:
 bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode permissive
 ```
 
+For strict/static-loader readiness (Linux publish gate), run:
+
+```bash
+bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode strict --require-static-loader
+```
+
+If strict loader reports missing stubs, use the script's `strict_stubs_path` output as:
+
+```bash
+export PYTHONSTRICTMODULESTUBSPATH=/path/to/strict/stubs
+```
+
 Equivalent direct command:
 
 ```bash

@@ -196,6 +196,17 @@
   margin-top: 0.25rem;
 }
 
+.historyFeature {
+  color: #1d4552;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.historyFeatureMeta {
+  color: #355764;
+  font-size: 0.73rem;
+}
+
 .controlsBlock {
   margin-top: 1rem;
   padding-top: 0.85rem;
