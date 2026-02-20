@@ -61,7 +61,11 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Tutorials',
-      items: ['tutorials/django-dummy-service', 'tutorials/measure-speedups']
+      items: [
+        'tutorials/simple-benchmark-usage',
+        'tutorials/django-dummy-service',
+        'tutorials/measure-speedups'
+      ]
     },
     {
       type: 'category',

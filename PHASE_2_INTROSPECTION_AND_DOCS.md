@@ -73,7 +73,7 @@ Secondary:
 - Clear separation between:
   - “confirmed by code/test”
   - “inferred / hypothesis”
-  - “unknown yet” (TODO)
+  - “unknown yet” (open question)
 
 ## Risks & mitigations
 - **Tooling portability**: clang tooling may vary. Provide graceful fallbacks.

@@ -76,6 +76,9 @@ Phase 4 deliverables are implemented with source-backed docs and deployment/test
 
 Remaining operational caveat:
 
-- As of 2026-02-19 in this workspace (macOS arm64), local upstream `cinderx` source build still
-  fails in bundled `fmt` C++ compilation (`malloc` / `free` undeclared), so CinderX-baselined
-  publishable benchmark runs remain blocked until upstream/runtime artifact resolution.
+- As of 2026-02-19 in this workspace (macOS arm64), default local upstream `cinderx` source build
+  path can fail in bundled `fmt` C++ compilation (`malloc` / `free` undeclared).
+- Validated local workaround path is documented and wired via
+  `make cinderx-install-local-macos` (`CXXFLAGS='-include cstdlib'` plus explicit `CMAKE_ARGS`).
+- This issue is still tracked as a known package caveat because the default install path is not yet
+  reliable on this platform/toolchain combination.

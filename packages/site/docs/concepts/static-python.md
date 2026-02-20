@@ -8,6 +8,8 @@ The upstream README identifies Static Python as another major CinderX feature.
 
 Source: [facebookincubator/cinderx README](https://github.com/facebookincubator/cinderx)
 
-:::info TODO
-Specific typing semantics, compile-time behavior, and tooling constraints will be documented only after source-level validation.
+:::info Current coverage
+Static Python behavior and runtime integration are documented in:
+`docs/architecture/static-python-runtime.mdx` and
+`docs/compatibility/c-extensions-and-abi.md`.
 :::

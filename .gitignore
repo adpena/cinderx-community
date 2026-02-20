@@ -1,22 +1,64 @@
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
 # Node / site
 node_modules/
+packages/site/node_modules/
 packages/site/.docusaurus/
 packages/site/build/
 packages/site/.cache/
 packages/site/.turbo/
+.pnpm-store/
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+*.so
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+.pyre/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
 .venv/
+.venv-*/
 venv/
+env/
+ENV/
+.python-version
+pip-wheel-metadata/
 
-# Upstream cache/artifacts
+# Upstream cache and local experiment artifacts
 .cache/
+history/
+data/runs/
+data/summary/reports/
+data/summary/smoke-*.json
+data/summary/pyperformance-*.json
+packages/site/static/data/summary/smoke-*.json
+packages/site/static/data/summary/pyperformance-*.json
+
+# App/demo artifacts
+*.sqlite3
+*.db
 
 # Logs and misc
-.DS_Store
 *.log

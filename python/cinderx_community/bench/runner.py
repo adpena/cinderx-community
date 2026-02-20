@@ -23,7 +23,11 @@ from cinderx_community import upstream
 SMOKE_SUITE = "smoke"
 PYPERFORMANCE_SUITE = "pyperformance"
 PLANNED_ONLY_SUITES = ["numba-asv", "real-apps"]
-SUPPORTED_SUITES = [SMOKE_SUITE, PYPERFORMANCE_SUITE, *PLANNED_ONLY_SUITES]
+SUPPORTED_SUITES = [
+    SMOKE_SUITE,
+    PYPERFORMANCE_SUITE,
+    *PLANNED_ONLY_SUITES,
+]
 PUBLISHABLE_SUITES = [SMOKE_SUITE, PYPERFORMANCE_SUITE]
 
 WORKLOAD_TAXONOMY = [
@@ -311,7 +315,8 @@ def build_plan(suite: str, python_executable: Path) -> BenchmarkPlan:
     else:
         note = (
             "Planning mode: this suite is declared but not yet automated in the harness. "
-            "Use --suite smoke or --suite pyperformance for runnable, reproducible baselines."
+            "Use --suite smoke or --suite pyperformance "
+            "for runnable, reproducible baselines."
         )
 
     return BenchmarkPlan(suite=suite, python_executable=path, notes=note)
@@ -569,6 +574,7 @@ def _validate_publishable_summary_payload(
     *, payload: dict[str, Any], expected_suite: str, source: str
 ) -> list[str]:
     failures: list[str] = []
+    allowed_runtime_keys = {"cpython", "cpython-cinderx", "pypy"}
 
     for key in ("run_id", "generated_at_utc", "machine"):
         value = payload.get(key)
@@ -639,6 +645,19 @@ def _validate_publishable_summary_payload(
         (item for item in runtime_rows if item.get("runtime") == "cpython-cinderx"),
         None,
     )
+    unexpected_runtime_rows = sorted(
+        {
+            str(item.get("runtime"))
+            for item in runtime_rows
+            if str(item.get("runtime")) not in allowed_runtime_keys
+        }
+    )
+    if unexpected_runtime_rows:
+        failures.append(
+            f"{source}: runtimes contains unsupported runtime key(s): "
+            f"{', '.join(unexpected_runtime_rows)}."
+        )
+
     if cinderx_runtime is None:
         failures.append(f"{source}: runtimes is missing an executed 'cpython-cinderx' row.")
     elif cinderx_runtime.get("executed") is not True:
@@ -658,6 +677,19 @@ def _validate_publishable_summary_payload(
     cinderx_benchmark_rows = [
         row for row in benchmark_rows if row.get("runtime") == "cpython-cinderx"
     ]
+    unexpected_benchmark_rows = sorted(
+        {
+            str(row.get("runtime"))
+            for row in benchmark_rows
+            if str(row.get("runtime")) not in allowed_runtime_keys
+        }
+    )
+    if unexpected_benchmark_rows:
+        failures.append(
+            f"{source}: benchmarks contains unsupported runtime key(s): "
+            f"{', '.join(unexpected_benchmark_rows)}."
+        )
+
     if not cinderx_benchmark_rows:
         failures.append(f"{source}: benchmarks is missing rows for runtime 'cpython-cinderx'.")
     else:
@@ -690,6 +722,92 @@ def _validate_summary_index_for_suites(
     for suite in suites:
         if not any(entry.get("suite") == suite for entry in entries):
             failures.append(f"{source}: index has no entry for suite '{suite}'.")
+    return failures
+
+
+def _parse_generated_at_utc(raw: Any) -> datetime | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    normalized = raw.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _validate_publish_suite_coherence(
+    *,
+    payload_by_suite: dict[str, dict[str, Any]],
+    source: str,
+    max_generated_at_skew_seconds: int = 3600,
+) -> list[str]:
+    failures: list[str] = []
+    if len(payload_by_suite) < 2:
+        return failures
+
+    run_id_by_suite = {
+        suite: str(payload.get("run_id") or "").strip()
+        for suite, payload in payload_by_suite.items()
+    }
+    machine_by_suite = {
+        suite: str(payload.get("machine") or "").strip()
+        for suite, payload in payload_by_suite.items()
+    }
+    repo_sha_by_suite = {
+        suite: str(
+            ((payload.get("metadata") or {}).get("toolchain") or {}).get("benchmark_repo_sha") or ""
+        ).strip()
+        for suite, payload in payload_by_suite.items()
+    }
+    generated_at_by_suite = {
+        suite: _parse_generated_at_utc(payload.get("generated_at_utc"))
+        for suite, payload in payload_by_suite.items()
+    }
+
+    if any(not value for value in run_id_by_suite.values()):
+        detail = ", ".join(
+            f"{suite}={run_id or '<missing>'}" for suite, run_id in sorted(run_id_by_suite.items())
+        )
+        failures.append(f"{source}: suite run_id is missing ({detail}).")
+
+    machines = {value for value in machine_by_suite.values() if value}
+    if len(machines) != 1:
+        detail = ", ".join(
+            f"{suite}={machine or '<missing>'}"
+            for suite, machine in sorted(machine_by_suite.items())
+        )
+        failures.append(f"{source}: suite machine mismatch ({detail}).")
+
+    repo_shas = {value for value in repo_sha_by_suite.values() if value}
+    if len(repo_shas) != 1:
+        detail = ", ".join(
+            f"{suite}={sha or '<missing>'}" for suite, sha in sorted(repo_sha_by_suite.items())
+        )
+        failures.append(f"{source}: suite benchmark_repo_sha mismatch ({detail}).")
+
+    if any(value is None for value in generated_at_by_suite.values()):
+        detail = ", ".join(
+            f"{suite}={payload_by_suite[suite].get('generated_at_utc')!r}"
+            for suite, value in sorted(generated_at_by_suite.items())
+            if value is None
+        )
+        failures.append(f"{source}: invalid generated_at_utc for suite(s) ({detail}).")
+    else:
+        generated_values = [value for value in generated_at_by_suite.values() if value is not None]
+        skew_seconds = (max(generated_values) - min(generated_values)).total_seconds()
+        if skew_seconds > max_generated_at_skew_seconds:
+            detail = ", ".join(
+                f"{suite}={payload_by_suite[suite].get('generated_at_utc')}"
+                for suite in sorted(payload_by_suite)
+            )
+            failures.append(
+                f"{source}: suite generated_at_utc skew is {skew_seconds:.1f}s "
+                f"(limit={max_generated_at_skew_seconds}s; {detail})."
+            )
+
     return failures
 
 
@@ -918,10 +1036,7 @@ def _runtime_targets(
     python: Path,
     cpython_cinderx: Path | None,
     pypy: Path | None,
-    nuitka: Path | None,
-    cython: Path | None,
-    numba: Path | None,
-    codon: Path | None,
+    include_pypy: bool = True,
 ) -> list[RuntimeTarget]:
     targets: list[RuntimeTarget] = [
         RuntimeTarget(
@@ -994,23 +1109,14 @@ def _runtime_targets(
         )
 
     optional_runtime("cpython-cinderx", "CPython + CinderX", "python-runtime", cpython_cinderx)
-    optional_runtime(
-        "pypy",
-        "PyPy",
-        "python-runtime",
-        pypy,
-        discover_names=("pypy3", "pypy"),
-    )
-    optional_runtime(
-        "nuitka",
-        "Nuitka",
-        "nuitka-aot",
-        nuitka,
-        discover_names=("nuitka",),
-    )
-    optional_runtime("cython", "Cython", "tool-placeholder", cython)
-    optional_runtime("numba", "Numba", "tool-placeholder", numba)
-    optional_runtime("codon", "Codon", "tool-placeholder", codon)
+    if include_pypy:
+        optional_runtime(
+            "pypy",
+            "PyPy",
+            "python-runtime",
+            pypy,
+            discover_names=("pypy3", "pypy"),
+        )
 
     return targets
 
@@ -1069,83 +1175,11 @@ def _run_smoke_case(
     )
 
 
-def _nuitka_command(executable: Path) -> list[str]:
-    if executable.name.lower().startswith("python"):
-        return [str(executable), "-m", "nuitka"]
-    return [str(executable)]
-
-
-def _compile_nuitka_smoke_worker(
-    *,
-    nuitka_executable: Path,
-    build_dir: Path,
-) -> tuple[Path, float, list[str]]:
-    worker_path = build_dir / "smoke_worker_nuitka.py"
-    worker_path.write_text(SMOKE_WORKER + "\n", encoding="utf-8")
-
-    compile_command = [
-        *_nuitka_command(nuitka_executable),
-        "--onefile",
-        f"--output-dir={build_dir}",
-        "--output-filename=smoke-worker",
-        str(worker_path),
-    ]
-    start = datetime.now(UTC)
-    _run_command(compile_command, timeout_s=1800)
-    end = datetime.now(UTC)
-    compile_seconds = max((end - start).total_seconds(), 0.0)
-
-    candidate_paths = [build_dir / "smoke-worker", build_dir / "smoke-worker.exe"]
-    for candidate in candidate_paths:
-        if candidate.exists() and candidate.is_file():
-            return candidate, compile_seconds, compile_command
-
-    for candidate in sorted(build_dir.glob("smoke-worker*")):
-        if candidate.is_file():
-            return candidate, compile_seconds, compile_command
-
-    raise ValueError("Nuitka smoke worker binary was not found after compilation.")
-
-
-def _run_nuitka_smoke_case(
-    compiled_worker: Path,
-    *,
-    benchmark: str,
-    warmups: int,
-    samples: int,
-    loops: int,
-) -> dict[str, Any]:
-    completed = _run_command(
-        [
-            str(compiled_worker),
-            benchmark,
-            str(warmups),
-            str(samples),
-            str(loops),
-        ]
-    )
-    return _parse_smoke_worker_output(
-        benchmark=benchmark,
-        output=completed.stdout,
-        runtime_label=str(compiled_worker),
-    )
-
-
 def _measure_startup(executable: Path, samples: int) -> list[float]:
     values: list[float] = []
     for _ in range(samples):
         start = datetime.now(UTC)
         _run_command([str(executable), "-c", "pass"], timeout_s=30)
-        end = datetime.now(UTC)
-        values.append((end - start).total_seconds())
-    return values
-
-
-def _measure_nuitka_startup(compiled_worker: Path, samples: int) -> list[float]:
-    values: list[float] = []
-    for _ in range(samples):
-        start = datetime.now(UTC)
-        _run_command([str(compiled_worker), "dynamic_dispatch", "0", "1", "1"], timeout_s=30)
         end = datetime.now(UTC)
         values.append((end - start).total_seconds())
     return values
@@ -1223,14 +1257,12 @@ def run_smoke_suite(
     require_cinderx_baseline: bool = False,
     cpython_cinderx: Path | None = None,
     pypy: Path | None = None,
-    nuitka: Path | None = None,
-    cython: Path | None = None,
-    numba: Path | None = None,
-    codon: Path | None = None,
     static_summary_root: Path | None = None,
     sample_count: int | None = None,
     warmup_count: int | None = None,
 ) -> BenchmarkRunResult:
+    suite_key = SMOKE_SUITE
+
     baseline_python = Path(os.path.abspath(str(python.expanduser())))
     if not baseline_python.exists():
         raise ValueError(f"Python executable does not exist: {baseline_python}")
@@ -1255,10 +1287,6 @@ def run_smoke_suite(
         python=baseline_python,
         cpython_cinderx=_normalize_path(cpython_cinderx),
         pypy=_normalize_path(pypy),
-        nuitka=_normalize_path(nuitka),
-        cython=_normalize_path(cython),
-        numba=_normalize_path(numba),
-        codon=_normalize_path(codon),
     )
     _enforce_cinderx_baseline_policy(
         targets=targets,
@@ -1270,7 +1298,7 @@ def run_smoke_suite(
 
     metadata: dict[str, Any] = {
         "generated_at_utc": generated_at_utc,
-        "suite": SMOKE_SUITE,
+        "suite": suite_key,
         "run_id": run_id,
         "machine": machine_name,
         "host": {
@@ -1313,13 +1341,13 @@ def run_smoke_suite(
 
     for target in targets:
         runtime_dir = run_root / target.key
-        runtime_report_path = runtime_dir / f"{SMOKE_SUITE}-{run_id}.json"
+        runtime_report_path = runtime_dir / f"{suite_key}-{run_id}.json"
         runtime_dir.mkdir(parents=True, exist_ok=True)
 
         if not target.available:
             skipped_runtimes.append(f"{target.key}: {target.reason}")
             payload = {
-                "suite": SMOKE_SUITE,
+                "suite": suite_key,
                 "runtime": target.key,
                 "available": False,
                 "reason": target.reason,
@@ -1331,60 +1359,13 @@ def run_smoke_suite(
             continue
 
         assert target.executable is not None
+        if target.mode != "python-runtime":
+            raise ValueError(f"smoke runtime target '{target.key}' is not a supported interpreter.")
         compile_time_seconds: float | None = None
         compile_command: list[str] | None = None
-        compiled_worker: Path | None = None
-        if target.mode == "python-runtime":
-            startup_values = _measure_startup(target.executable, startup_samples)
-            runtime_details = _python_runtime_details(target.executable)
-            runtime_version = _version_line(target.executable)
-        elif target.mode == "nuitka-aot":
-            build_dir = runtime_dir / "build"
-            build_dir.mkdir(parents=True, exist_ok=True)
-            try:
-                compiled_worker, compile_time_seconds, compile_command = (
-                    _compile_nuitka_smoke_worker(
-                        nuitka_executable=target.executable,
-                        build_dir=build_dir,
-                    )
-                )
-            except ValueError as exc:
-                message = f"nuitka adapter failed ({exc})"
-                skipped_runtimes.append(f"{target.key}: {message}")
-                payload = {
-                    "suite": SMOKE_SUITE,
-                    "runtime": target.key,
-                    "available": True,
-                    "executed": False,
-                    "reason": message,
-                    "source": target.source,
-                    "generated_at_utc": generated_at_utc,
-                }
-                _safe_json(runtime_report_path, payload)
-                runtime_reports.append(str(runtime_report_path))
-                continue
-
-            startup_values = _measure_nuitka_startup(compiled_worker, startup_samples)
-            runtime_version = _version_line(target.executable)
-            runtime_details = {
-                "implementation": "Nuitka",
-                "tool_command": " ".join(_nuitka_command(target.executable)),
-                "compiled_worker": str(compiled_worker),
-            }
-        else:
-            skipped_runtimes.append(f"{target.key}: adapter not yet implemented for smoke suite")
-            payload = {
-                "suite": SMOKE_SUITE,
-                "runtime": target.key,
-                "available": True,
-                "executed": False,
-                "reason": "adapter not yet implemented for smoke suite",
-                "source": target.source,
-                "generated_at_utc": generated_at_utc,
-            }
-            _safe_json(runtime_report_path, payload)
-            runtime_reports.append(str(runtime_report_path))
-            continue
+        startup_values = _measure_startup(target.executable, startup_samples)
+        runtime_details = _python_runtime_details(target.executable)
+        runtime_version = _version_line(target.executable)
 
         startup_mean = _mean(startup_values)
         startup_stdev = _stdev(startup_values)
@@ -1394,23 +1375,13 @@ def run_smoke_suite(
 
         for case in SMOKE_CASES:
             loops = case.ci_loops if ci_mode else case.loops
-            if target.mode == "python-runtime":
-                raw = _run_smoke_case(
-                    target.executable,
-                    benchmark=case.benchmark,
-                    warmups=warmups,
-                    samples=samples,
-                    loops=loops,
-                )
-            else:
-                assert compiled_worker is not None
-                raw = _run_nuitka_smoke_case(
-                    compiled_worker,
-                    benchmark=case.benchmark,
-                    warmups=warmups,
-                    samples=samples,
-                    loops=loops,
-                )
+            raw = _run_smoke_case(
+                target.executable,
+                benchmark=case.benchmark,
+                warmups=warmups,
+                samples=samples,
+                loops=loops,
+            )
             mean_seconds = _mean(raw["samples"])
             stdev_seconds = _stdev(raw["samples"])
 
@@ -1449,7 +1420,7 @@ def run_smoke_suite(
             )
 
         runtime_payload = {
-            "suite": SMOKE_SUITE,
+            "suite": suite_key,
             "run_id": run_id,
             "generated_at_utc": generated_at_utc,
             "runtime": target.key,
@@ -1493,14 +1464,10 @@ def run_smoke_suite(
             "Smoke suite is for reproducibility/sanity checks and should not be "
             "treated as a full performance claim."
         ),
-        (
-            "Cython/Numba/Codon adapters are declared but execution adapters remain "
-            "workload-specific TODOs."
-        ),
     ]
 
     summary_payload: dict[str, Any] = {
-        "suite": SMOKE_SUITE,
+        "suite": suite_key,
         "run_id": run_id,
         "generated_at_utc": generated_at_utc,
         "machine": machine_name,
@@ -1515,8 +1482,8 @@ def run_smoke_suite(
 
     summary_root_path = summary_root.expanduser().resolve()
     summary_root_path.mkdir(parents=True, exist_ok=True)
-    summary_path = summary_root_path / f"{SMOKE_SUITE}-{date_slug}-{machine_slug}-{run_id}.json"
-    latest_summary_path = summary_root_path / f"latest-{SMOKE_SUITE}.json"
+    summary_path = summary_root_path / f"{suite_key}-{date_slug}-{machine_slug}-{run_id}.json"
+    latest_summary_path = summary_root_path / f"latest-{suite_key}.json"
 
     _safe_json(summary_path, summary_payload)
     shutil.copy2(summary_path, latest_summary_path)
@@ -1524,7 +1491,7 @@ def run_smoke_suite(
         summary_root_path / "index.json",
         _summary_entry(
             file_name=summary_path.name,
-            suite=SMOKE_SUITE,
+            suite=suite_key,
             run_id=run_id,
             machine=machine_name,
             generated_at_utc=generated_at_utc,
@@ -1559,7 +1526,7 @@ def run_smoke_suite(
         notes.append("Some runtimes/tools were skipped; see skipped_runtimes field.")
 
     return BenchmarkRunResult(
-        suite=SMOKE_SUITE,
+        suite=suite_key,
         run_id=run_id,
         machine=machine_name,
         output_root=str(run_root),
@@ -1787,10 +1754,6 @@ def run_pyperformance_suite(
     require_cinderx_baseline: bool = False,
     cpython_cinderx: Path | None = None,
     pypy: Path | None = None,
-    nuitka: Path | None = None,
-    cython: Path | None = None,
-    numba: Path | None = None,
-    codon: Path | None = None,
     static_summary_root: Path | None = None,
 ) -> BenchmarkRunResult:
     python_hint = Path(os.path.abspath(str(python.expanduser())))
@@ -1816,10 +1779,6 @@ def run_pyperformance_suite(
         python=baseline_python,
         cpython_cinderx=_normalize_path(cpython_cinderx),
         pypy=_normalize_path(pypy),
-        nuitka=_normalize_path(nuitka),
-        cython=_normalize_path(cython),
-        numba=_normalize_path(numba),
-        codon=_normalize_path(codon),
     )
     _enforce_cinderx_baseline_policy(
         targets=targets,
@@ -1893,24 +1852,11 @@ def run_pyperformance_suite(
             runtime_reports.append(str(runtime_report_path))
             continue
 
-        if target.mode != "python-runtime":
-            skipped_runtimes.append(
-                f"{target.key}: adapter not yet implemented for pyperformance suite"
+        if target.mode != "python-runtime" or target.executable is None:
+            raise ValueError(
+                f"pyperformance runtime target '{target.key}' is not a supported interpreter."
             )
-            payload = {
-                "suite": PYPERFORMANCE_SUITE,
-                "runtime": target.key,
-                "available": True,
-                "executed": False,
-                "reason": "adapter not yet implemented for pyperformance suite",
-                "source": target.source,
-                "generated_at_utc": generated_at_utc,
-            }
-            _safe_json(runtime_report_path, payload)
-            runtime_reports.append(str(runtime_report_path))
-            continue
 
-        assert target.executable is not None
         startup_values = _measure_startup(target.executable, startup_samples)
         startup_mean = _mean(startup_values)
         startup_stdev = _stdev(startup_values)
@@ -2170,6 +2116,8 @@ def verify_publishable_summaries(
 
     failures: list[str] = []
     checked_files: list[str] = []
+    summary_payload_by_suite: dict[str, dict[str, Any]] = {}
+    static_payload_by_suite: dict[str, dict[str, Any]] = {}
 
     summary_index_path = summary_root_path / "index.json"
     if not summary_index_path.exists():
@@ -2217,6 +2165,7 @@ def verify_publishable_summaries(
                 source=str(summary_latest_path),
             )
         )
+        summary_payload_by_suite[suite] = summary_payload
         checked_files.append(str(summary_latest_path))
 
         if static_root_path is None:
@@ -2235,12 +2184,27 @@ def verify_publishable_summaries(
                 source=str(static_latest_path),
             )
         )
+        static_payload_by_suite[suite] = static_payload
         if static_payload != summary_payload:
             failures.append(
                 f"Summary/static mismatch for suite '{suite}' between "
                 f"{summary_latest_path} and {static_latest_path}."
             )
         checked_files.append(str(static_latest_path))
+
+    failures.extend(
+        _validate_publish_suite_coherence(
+            payload_by_suite=summary_payload_by_suite,
+            source=f"{summary_root_path}/latest-*.json",
+        )
+    )
+    if static_root_path is not None:
+        failures.extend(
+            _validate_publish_suite_coherence(
+                payload_by_suite=static_payload_by_suite,
+                source=f"{static_root_path}/latest-*.json",
+            )
+        )
 
     if failures:
         detail = "\n".join(f"- {item}" for item in failures)
@@ -2250,6 +2214,7 @@ def verify_publishable_summaries(
         "All required latest summary files are CinderX-baselined and policy-enforced.",
         "Required host/toolchain/guardrail metadata is present for each verified suite.",
         "Summary and static summary payloads match for each verified suite.",
+        "Verified suites are coherent (machine/repo SHA alignment and bounded timestamp skew).",
     ]
     return PublishVerificationResult(
         summary_root=str(summary_root_path),

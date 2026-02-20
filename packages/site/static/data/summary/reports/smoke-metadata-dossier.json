@@ -1,19 +1,19 @@
 {
   "baseline_runtime": "cpython-cinderx",
-  "generated_at_utc": "2026-02-20T03:47:37.072851+00:00",
-  "machine": "Alejandros-MBP.attlocal.net",
+  "generated_at_utc": "2026-02-19T22:28:11.186595+00:00",
+  "machine": "runnervmez679",
   "metadata": {
-    "generated_at_utc": "2026-02-20T03:47:37.072851+00:00",
+    "generated_at_utc": "2026-02-19T22:28:11.186595+00:00",
     "guardrails": {
       "checks": [
         {
-          "detail": "Affinity API unavailable on this platform.",
-          "enforceable": false,
+          "detail": "Visible CPUs: 4 / 4",
+          "enforceable": true,
           "name": "cpu_affinity",
-          "status": "info"
+          "status": "warn"
         },
         {
-          "detail": "1m load average: 3.88 (cpu_count=8)",
+          "detail": "1m load average: 0.28 (cpu_count=4)",
           "enforceable": true,
           "name": "background_load",
           "status": "ok"
@@ -37,17 +37,19 @@
           "status": "ok"
         }
       ],
-      "enforceable_failures": []
+      "enforceable_failures": [
+        "CPU affinity is not pinned to a restricted core set."
+      ]
     },
     "host": {
-      "architecture": "arm64",
-      "cpu_logical_count": 8,
-      "cpu_model": "Apple M1",
-      "kernel": "25.3.0",
-      "os": "Darwin",
-      "ram_total_bytes": 8589934592
+      "architecture": "x86_64",
+      "cpu_logical_count": 4,
+      "cpu_model": "AMD EPYC 7763 64-Core Processor",
+      "kernel": "6.8.0-1044-azure",
+      "os": "Linux",
+      "ram_total_bytes": 16772182016
     },
-    "machine": "Alejandros-MBP.attlocal.net",
+    "machine": "runnervmez679",
     "run_config": {
       "ci_mode": true,
       "require_cinderx_baseline": true,
@@ -55,10 +57,10 @@
       "startup_samples": 3,
       "warmups": 1
     },
-    "run_id": "20260220T034737Z",
+    "run_id": "20260219T222811Z",
     "suite": "smoke",
     "toolchain": {
-      "benchmark_repo_sha": "cc25230501554b4c3908207be9731910e8ba915b",
+      "benchmark_repo_sha": "677b4b1622fde95affdc2469661c4d3bcee2d148",
       "cinderx_upstream": {
         "clone_timestamp_utc": "2026-02-19T15:53:52.396865+00:00",
         "commit_sha": "31bca9f3156b78cca3c6b36000c42c48f5ddf037",
@@ -66,6 +68,6 @@
       }
     }
   },
-  "run_id": "20260220T034737Z",
+  "run_id": "20260219T222811Z",
   "suite": "smoke"
 }

@@ -34,7 +34,7 @@ jobs:
           uv venv --python 3.14 .venv
           uv pip install --python .venv/bin/python -e ./python[dev]
           uv pip install --python .venv/bin/python setuptools
-          uv pip install --python .venv/bin/python pyperformance nuitka
+          uv pip install --python .venv/bin/python pyperformance
 
       - name: Attempt CinderX install on hosted runner
         id: cinderx_install
@@ -158,7 +158,7 @@ jobs:
           uv venv --python "$(command -v python)" .venv
           uv pip install --python .venv/bin/python -e ./python[dev]
           uv pip install --python .venv/bin/python setuptools
-          uv pip install --python .venv/bin/python pyperformance nuitka
+          uv pip install --python .venv/bin/python pyperformance
 
       - name: Install and verify CinderX baseline (strict)
         id: cinderx_strict
@@ -188,7 +188,6 @@ jobs:
             --suite smoke \
             --python "${{ steps.cinderx_strict.outputs.python_bin }}" \
             --cpython-cinderx "${{ steps.cinderx_strict.outputs.cinderx_bin }}" \
-            --nuitka ".venv/bin/nuitka" \
             --require-cinderx-baseline \
             --ci-mode \
             --out data/runs \
@@ -196,7 +195,6 @@ jobs:
             --static-summary-out packages/site/static/data/summary
 
       - name: Run pyperformance suite (publishable)
-        if: ${{ github.event_name == 'schedule' || inputs.run_pyperformance == true }}
         run: |
           .venv/bin/cxc bench run \
             --suite pyperformance \
@@ -208,31 +206,13 @@ jobs:
             --summary-out data/summary \
             --static-summary-out packages/site/static/data/summary
 
-      - name: Verify publish guard (smoke only)
-        if: ${{ !(github.event_name == 'schedule' || inputs.run_pyperformance == true) }}
-        run: |
-          .venv/bin/cxc bench verify-publish \
-            --summary-root data/summary \
-            --static-summary-root packages/site/static/data/summary \
-            --require-suite smoke
-
       - name: Verify publish guard (smoke + pyperformance)
-        if: ${{ github.event_name == 'schedule' || inputs.run_pyperformance == true }}
         run: |
           .venv/bin/cxc bench verify-publish \
             --summary-root data/summary \
             --static-summary-root packages/site/static/data/summary
 
-      - name: Export metadata dossier (smoke only)
-        if: ${{ !(github.event_name == 'schedule' || inputs.run_pyperformance == true) }}
-        run: |
-          .venv/bin/cxc bench export-dossier \
-            --summary-root data/summary \
-            --output-root data/summary/reports \
-            --require-suite smoke
-
       - name: Export metadata dossier (smoke + pyperformance)
-        if: ${{ github.event_name == 'schedule' || inputs.run_pyperformance == true }}
         run: |
           .venv/bin/cxc bench export-dossier \
             --summary-root data/summary \
@@ -304,13 +284,45 @@ jobs:
           fi
 
           curated_summary_dir="$(mktemp -d)"
-          previous_latest_dir="$(mktemp -d)"
-          if [[ -d "${latest_dir}" ]]; then
-            cp -R "${latest_dir}/." "${previous_latest_dir}/" || true
+          for latest_name in latest-smoke.json latest-pyperformance.json; do
+            if [[ ! -f "${summary_root}/${latest_name}" ]]; then
+              echo "::error::Missing required publishable suite summary: ${summary_root}/${latest_name}"
+              exit 1
+            fi
+          done
+
+          smoke_run_id="$(jq -r '.run_id // empty' "${summary_root}/latest-smoke.json")"
+          pyperf_run_id="$(jq -r '.run_id // empty' "${summary_root}/latest-pyperformance.json")"
+          if [[ -z "${smoke_run_id}" || -z "${pyperf_run_id}" ]]; then
+            echo "::error::Run coherence check failed: missing run_id in latest summary payload."
+            exit 1
           fi
 
-          smoke_run_id="$(jq -r '.run_id // empty' "${summary_root}/latest-smoke.json" 2>/dev/null || true)"
-          pyperf_run_id="$(jq -r '.run_id // empty' "${summary_root}/latest-pyperformance.json" 2>/dev/null || true)"
+          smoke_machine="$(jq -r '.machine // empty' "${summary_root}/latest-smoke.json")"
+          pyperf_machine="$(jq -r '.machine // empty' "${summary_root}/latest-pyperformance.json")"
+          if [[ -z "${smoke_machine}" || -z "${pyperf_machine}" || "${smoke_machine}" != "${pyperf_machine}" ]]; then
+            echo "::error::Run coherence check failed: smoke machine (${smoke_machine:-missing}) != pyperformance machine (${pyperf_machine:-missing})."
+            exit 1
+          fi
+
+          smoke_generated_at="$(jq -r '.generated_at_utc // empty' "${summary_root}/latest-smoke.json")"
+          pyperf_generated_at="$(jq -r '.generated_at_utc // empty' "${summary_root}/latest-pyperformance.json")"
+          if [[ -z "${smoke_generated_at}" || -z "${pyperf_generated_at}" ]]; then
+            echo "::error::Run coherence check failed: missing generated_at_utc in latest summary payload."
+            exit 1
+          fi
+          python3 - "${smoke_generated_at}" "${pyperf_generated_at}" <<'PY'
+import datetime
+import sys
+
+smoke = datetime.datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00"))
+pyperf = datetime.datetime.fromisoformat(sys.argv[2].replace("Z", "+00:00"))
+skew = abs((smoke - pyperf).total_seconds())
+if skew > 3600:
+    raise SystemExit(
+        f"Run coherence check failed: generated_at_utc skew {skew:.1f}s exceeds 3600s."
+    )
+PY
 
           if [[ -f "${summary_root}/index.json" ]]; then
             jq \
@@ -324,9 +336,9 @@ jobs:
                   (.entries // [])
                   | map(
                       select(
-                        ($smoke_run_id != "" and .run_id == $smoke_run_id)
+                        (.suite == "smoke" and .run_id == $smoke_run_id)
                         or
-                        ($pyperf_run_id != "" and .run_id == $pyperf_run_id)
+                        (.suite == "pyperformance" and .run_id == $pyperf_run_id)
                       )
                     )
                 )
@@ -334,19 +346,18 @@ jobs:
               ' \
               "${summary_root}/index.json" > "${curated_summary_dir}/index.json"
           else
-            cat > "${curated_summary_dir}/index.json" <<'JSON'
-          {
-            "updated_at_utc": "",
-            "entries": []
-          }
-          JSON
+            echo "::error::Missing ${summary_root}/index.json"
+            exit 1
           fi
 
-          for latest_name in latest-smoke.json latest-pyperformance.json; do
-            if [[ -f "${summary_root}/${latest_name}" ]]; then
-              cp "${summary_root}/${latest_name}" "${curated_summary_dir}/${latest_name}"
-            fi
-          done
+          if ! jq -e '([.entries[]? | select(.suite == "smoke")] | length) >= 1 and ([.entries[]? | select(.suite == "pyperformance")] | length) >= 1' "${curated_summary_dir}/index.json" >/dev/null; then
+            echo "::error::Curated index missing smoke and/or pyperformance entries for current latest summaries."
+            cat "${curated_summary_dir}/index.json"
+            exit 1
+          fi
+
+          cp "${summary_root}/latest-smoke.json" "${curated_summary_dir}/latest-smoke.json"
+          cp "${summary_root}/latest-pyperformance.json" "${curated_summary_dir}/latest-pyperformance.json"
 
           mapfile -t selected_files < <(jq -r '.entries[]?.file // empty' "${curated_summary_dir}/index.json")
           for rel_path in "${selected_files[@]}"; do
@@ -360,46 +371,6 @@ jobs:
             find "${summary_root}/reports" -maxdepth 1 -type f -name '*metadata-dossier.json' -exec cp {} "${curated_summary_dir}/reports/" \;
           fi
 
-          for suite in smoke pyperformance; do
-            latest_name="latest-${suite}.json"
-            if [[ -f "${curated_summary_dir}/${latest_name}" ]]; then
-              continue
-            fi
-            if [[ ! -f "${previous_latest_dir}/${latest_name}" ]]; then
-              continue
-            fi
-
-            cp "${previous_latest_dir}/${latest_name}" "${curated_summary_dir}/${latest_name}"
-
-            previous_file="$(jq -r --arg suite "${suite}" '(.entries // []) | map(select(.suite == $suite)) | .[0].file // empty' "${previous_latest_dir}/index.json" 2>/dev/null || true)"
-            if [[ -n "${previous_file}" && -f "${previous_latest_dir}/${previous_file}" ]]; then
-              cp "${previous_latest_dir}/${previous_file}" "${curated_summary_dir}/${previous_file}"
-            fi
-
-            previous_entry="$(jq -c --arg suite "${suite}" '(.entries // []) | map(select(.suite == $suite)) | .[0] // empty' "${previous_latest_dir}/index.json" 2>/dev/null || true)"
-            if [[ -n "${previous_entry}" ]]; then
-              tmp_index="$(mktemp)"
-              jq \
-                --argjson previous "${previous_entry}" \
-                --arg suite "${suite}" \
-                '
-                .entries = (
-                  (.entries // [])
-                  | if any(.[]?; .suite == $suite) then . else . + [$previous] end
-                )
-                ' \
-                "${curated_summary_dir}/index.json" > "${tmp_index}"
-              mv "${tmp_index}" "${curated_summary_dir}/index.json"
-            fi
-
-            if [[ -d "${previous_latest_dir}/reports" ]]; then
-              mkdir -p "${curated_summary_dir}/reports"
-              find "${previous_latest_dir}/reports" -maxdepth 1 -type f -name "${suite}-metadata-dossier.json" -exec cp {} "${curated_summary_dir}/reports/" \;
-            fi
-
-            echo "::notice::Carried forward previous latest ${suite} summary into history/latest."
-          done
-
           mkdir -p "${dest_summary_dir}"
           cp -R "${curated_summary_dir}/." "${dest_summary_dir}/"
 
@@ -407,14 +378,8 @@ jobs:
           mkdir -p "${latest_dir}"
           cp -R "${curated_summary_dir}/." "${latest_dir}/"
 
-          smoke_latest_path=""
-          pyperf_latest_path=""
-          if [[ -f "${curated_summary_dir}/latest-smoke.json" ]]; then
-            smoke_latest_path="history/latest/latest-smoke.json"
-          fi
-          if [[ -f "${curated_summary_dir}/latest-pyperformance.json" ]]; then
-            pyperf_latest_path="history/latest/latest-pyperformance.json"
-          fi
+          smoke_latest_path="history/latest/latest-smoke.json"
+          pyperf_latest_path="history/latest/latest-pyperformance.json"
 
           manifest="history/index.json"
           if [[ ! -f "${manifest}" ]]; then

@@ -31,7 +31,7 @@ Thanks for helping build CinderX Community.
 
 - Treat upstream README/blog/docs as source of truth.
 - Do not present unverified assumptions as facts.
-- Mark unverified technical details with a TODO callout.
+- Mark unverified technical details as hypotheses with explicit validation notes.
 
 ## Benchmarks Policy (Bootstrap Phase)
 

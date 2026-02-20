@@ -76,7 +76,6 @@ automation hygiene improvements.
   - dependency automation: `.github/dependabot.yml`
   - docs spellcheck in site lint flow via `cspell` (`packages/site/package.json`,
     `packages/site/.cspell.json`)
-
-Optional future enhancement:
-
-- Add release automation workflow for packaged Python artifacts and site version/changelog cadence.
+  - release automation workflow:
+    - `.github/workflows/release.yml` builds Python package artifacts + site bundle and publishes
+      GitHub Releases on tag push or manual dispatch.

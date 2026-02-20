@@ -22,6 +22,7 @@ This page renders benchmark summaries published under `data/summary/*.json` and 
 - Includes per-benchmark statistical fields (`p_value`, optional RSS, optional compile time) in dashboard tables
 - The CinderX headline preset is only active for summaries that actually include a CinderX baseline runtime
 - Runtime speedup charts are intentionally hidden for non-CinderX-baselined summaries to avoid CPython-framed headline comparisons
+- Includes a `Published runs` table (date, suite, run id, machine, baseline, policy, mode) for quick provenance checks
 - Publishable summary history is persisted to the `bench-results` branch for trend ingestion (`history/index.json`)
 
 <BenchSummaryDashboard />

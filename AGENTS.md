@@ -19,7 +19,7 @@ Repo-level governance and automation live in `.github/`, `README.md`, `CONTRIBUT
 - `make cinderx-install-local`: attempt local CinderX install into `.venv` (`--no-build-isolation`).
 - `make cinderx-install-local-macos`: macOS arm64 fallback install path for upstream `fmt` header failures during local `cinderx` source build.
 - `bash scripts/ci/install_and_probe_cinderx.sh --python .venv/bin/python --mode permissive`: staged CinderX install + import probe + diagnostics capture (CI parity path).
-- `make bench-toolchain`: install local benchmark dependencies (`pyperformance`, `nuitka`).
+- `make bench-toolchain`: install local benchmark dependencies (`pyperformance`).
 - `make bench-smoke-local`: run local smoke suite in CI-shape mode.
 - `make bench-pyperformance-local`: run local pyperformance suite in CI-shape mode.
 - `make bench-smoke-local-cinderx`: run local smoke suite with required CinderX baseline (`CINDERX_PYTHON=...`).
@@ -36,7 +36,7 @@ corepack enable
 pnpm -C packages/site install
 uv pip install --python .venv/bin/python -e ./python[dev]
 uv add --project ./python --optional cinderx cinderx --no-sync
-uv pip install --python .venv/bin/python pyperformance nuitka
+uv pip install --python .venv/bin/python pyperformance
 ```
 
 ## Python Package Management (uv-only)
@@ -69,7 +69,7 @@ uv pip install --python .venv/bin/python pyperformance nuitka
 Local workspace snapshot may not include `.git` metadata; use Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`) moving forward.
 - Keep PRs focused and reviewable.
 - Before opening PRs, run `make lint test build`.
-- Update docs for behavior changes and cite sources for CinderX claims (or mark as TODO/hypothesis).
+- Update docs for behavior changes and cite sources for CinderX claims (or label claims as hypothesis/inference until validated).
 - Do not commit secrets or generated site build artifacts.
 
 ## Security & Configuration Tips

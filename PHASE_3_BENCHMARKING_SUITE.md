@@ -12,7 +12,6 @@ actual application behavior).
 
 ## Key reference suites (to integrate, not reinvent)
 - **pyperformance**: “authoritative” Python benchmark suite with real-world focus.
-- **Nuitka** benchmarking patterns: AOT compile/run workflows, compile-time accounting, and runtime measurement.
 - **numba/numba-benchmark**: ASV-based suite for Numba.
 - **speed.pypy.org benchmarks**: Unladen Swallow-derived suite, plus their reporting patterns.
 
@@ -32,7 +31,6 @@ actual application behavior).
      - CPython + CinderX (primary baseline for comparison publishing)
      - CPython 3.14 (reference runtime, not the primary comparison baseline)
      - PyPy (optional comparator)
-     - Nuitka (optional comparator with compile-time reporting)
      - Cython, Numba, Codon (workload-dependent; some are compilers/tools)
    - Use adapters per runtime/tool with consistent output format.
    - Enforce CinderX-first comparison policy for publishable comparisons (for example `--require-cinderx-baseline`).
@@ -99,8 +97,10 @@ benchmark workflow wiring.
     - `cxc bench run --suite pyperformance ...`
   - Multi-runtime adapters:
     - implemented baseline: CPython + CinderX (`--cpython-cinderx`) as primary comparison baseline
-    - implemented comparators: CPython, PyPy (explicit `--pypy` or auto-detected `pypy3`/`pypy`), Nuitka (explicit `--nuitka` or auto-detected `nuitka`)
-    - declared/TODO: Cython, Numba, Codon workload-specific adapters
+    - implemented comparators:
+      - smoke (interpreter-focused): CPython, CinderX, PyPy
+    - de-scoped from runnable harness: Cython, Numba, Codon comparator flags were removed until a dedicated methodology exists
+    - pyperformance comparator scope is now strict interpreter runtimes only (CPython/CinderX/PyPy)
   - Baseline policy:
     - `--require-cinderx-baseline` blocks comparison runs that would otherwise fall back to CPython-only baselines
     - `--cpython-cinderx` is validated as CinderX-capable (`import cinderx`/runtime branding); non-CinderX executables are rejected to avoid mislabeled baselines

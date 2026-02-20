@@ -9,7 +9,7 @@ Use this guide to pick an issue that is easy to land and still high-value.
 ## Good first issue criteria in this repo
 
 - Small, isolated change (single page, single command, or one adapter improvement)
-- Source-backed docs updates or clear TODO/hypothesis marking
+- Source-backed docs updates or clear open-question/hypothesis marking
 - No benchmark claim inflation
 - Can be validated with:
   - `make lint`

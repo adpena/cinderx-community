@@ -50,8 +50,8 @@ If binary wheels are not available for your exact platform/toolchain:
 
 Use a staged matrix:
 
-- `cpython-3.14` mandatory gate (unit + integration),
-- `cinderx` canary gate (unit + integration + smoke benchmark),
+- `cinderx` mandatory gate (unit + integration + smoke benchmark),
+- `cpython-3.14` compatibility gate (rollback/fallback verification),
 - optional nightly CinderX benchmark run with metadata dossier export.
 
 ## 5) Deployment policy recommendation

@@ -17,7 +17,7 @@ This project is community-run with clear ownership and lightweight decision rule
 
 ## Change categories
 
-- `docs`: source-cited or explicitly marked TODO/hypothesis.
+- `docs`: source-cited or explicitly marked as hypothesis/inference when evidence is pending.
 - `tooling`: must pass lint/test/build and include migration notes when behavior changes.
 - `benchmark-policy`: must preserve or strengthen reproducibility and anti-mislabel guardrails.
 

@@ -6,7 +6,7 @@ title: Docs writing rules
 
 - Cite primary sources for CinderX claims.
 - Avoid speculation presented as fact.
-- Use TODO callouts for anything pending validation.
+- Use explicit "validation scope" or "open question" callouts for anything pending validation.
 - Prefer short, verifiable statements over broad unsupported claims.
 
 Current source anchors:

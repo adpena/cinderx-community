@@ -8,7 +8,8 @@ Use layered validation rather than a single pass/fail signal.
 
 ## Layer 1: unit tests
 
-- Run the same unit suite under stock CPython 3.14 and CinderX runtime.
+- Run the unit suite under the CinderX runtime first.
+- Run the same unit suite under stock CPython 3.14 as a compatibility/rollback check.
 - Keep failures grouped by dependency class (pure Python vs extension-heavy).
 
 ## Layer 2: integration tests
@@ -27,7 +28,7 @@ CINDERX_PYTHON=/path/to/cinderx-python make bench-smoke-local-cinderx
 ```
 
 - Use `--ci-mode` for fast non-claim checks.
-- Use `--require-cinderx-baseline` for any comparison run that may be published.
+- Use `--require-cinderx-baseline` for any run intended for published comparisons.
 
 ## Layer 4: publishable benchmark validation
 

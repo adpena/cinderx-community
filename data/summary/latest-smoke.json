@@ -1,95 +1,174 @@
 {
-  "baseline_runtime": "cpython",
+  "baseline_runtime": "cpython-cinderx",
   "benchmarks": [
     {
       "benchmark": "dynamic_dispatch",
       "compile_time_seconds": null,
-      "mean_seconds": 0.0009389723321267714,
+      "mean_seconds": 0.0026033694271713364,
       "memory_rss_bytes": 21577728,
-      "p_value": null,
+      "p_value": 0.0002597254985393811,
       "runtime": "cpython",
       "runtime_label": "CPython baseline",
-      "sample_count": 3,
-      "speedup_vs_baseline": 1.0,
-      "startup_mean_seconds": 0.021352333333333334,
-      "startup_stdev_seconds": 0.0007367498444745907,
-      "stdev_seconds": 2.3552725076507077e-06,
-      "warmup_count": 1,
+      "sample_count": 7,
+      "speedup_vs_baseline": 0.9962021748638813,
+      "startup_mean_seconds": 0.0137292,
+      "startup_stdev_seconds": 6.608857692521449e-05,
+      "stdev_seconds": 5.744131967634051e-06,
+      "warmup_count": 2,
       "workload_class": "interpreter-heavy-dynamic-dispatch"
     },
     {
       "benchmark": "compute_numeric",
       "compile_time_seconds": null,
-      "mean_seconds": 0.005341139321293061,
-      "memory_rss_bytes": 21594112,
-      "p_value": null,
+      "mean_seconds": 0.013771434714726638,
+      "memory_rss_bytes": 21610496,
+      "p_value": 0.28176099796130805,
       "runtime": "cpython",
       "runtime_label": "CPython baseline",
-      "sample_count": 3,
-      "speedup_vs_baseline": 1.0,
-      "startup_mean_seconds": 0.021352333333333334,
-      "startup_stdev_seconds": 0.0007367498444745907,
-      "stdev_seconds": 0.00012890840961520502,
-      "warmup_count": 1,
+      "sample_count": 7,
+      "speedup_vs_baseline": 1.0014885677293448,
+      "startup_mean_seconds": 0.0137292,
+      "startup_stdev_seconds": 6.608857692521449e-05,
+      "stdev_seconds": 3.8816020989194726e-05,
+      "warmup_count": 2,
       "workload_class": "compute-bound-numeric"
     },
     {
       "benchmark": "serialization_json",
       "compile_time_seconds": null,
-      "mean_seconds": 0.012657847333078584,
-      "memory_rss_bytes": 21692416,
-      "p_value": null,
+      "mean_seconds": 0.03056701771440982,
+      "memory_rss_bytes": 21905408,
+      "p_value": 1.5317725471267772e-11,
       "runtime": "cpython",
       "runtime_label": "CPython baseline",
-      "sample_count": 3,
-      "speedup_vs_baseline": 1.0,
-      "startup_mean_seconds": 0.021352333333333334,
-      "startup_stdev_seconds": 0.0007367498444745907,
-      "stdev_seconds": 9.843627221452104e-05,
-      "warmup_count": 1,
+      "sample_count": 7,
+      "speedup_vs_baseline": 0.99055354357681,
+      "startup_mean_seconds": 0.0137292,
+      "startup_stdev_seconds": 6.608857692521449e-05,
+      "stdev_seconds": 9.091223805164468e-05,
+      "warmup_count": 2,
       "workload_class": "serialization-heavy"
     },
     {
       "benchmark": "io_tempfile",
       "compile_time_seconds": null,
-      "mean_seconds": 0.022952138669400785,
-      "memory_rss_bytes": 21643264,
-      "p_value": null,
+      "mean_seconds": 0.05535982757230938,
+      "memory_rss_bytes": 21872640,
+      "p_value": 4.113975834687269e-15,
       "runtime": "cpython",
       "runtime_label": "CPython baseline",
-      "sample_count": 3,
-      "speedup_vs_baseline": 1.0,
-      "startup_mean_seconds": 0.021352333333333334,
-      "startup_stdev_seconds": 0.0007367498444745907,
-      "stdev_seconds": 0.0016352620885011276,
-      "warmup_count": 1,
+      "sample_count": 7,
+      "speedup_vs_baseline": 0.9461937914128776,
+      "startup_mean_seconds": 0.0137292,
+      "startup_stdev_seconds": 6.608857692521449e-05,
+      "stdev_seconds": 0.0008102366918147408,
+      "warmup_count": 2,
       "workload_class": "io-bound"
     },
     {
       "benchmark": "hashlib_sha256",
       "compile_time_seconds": null,
-      "mean_seconds": 0.004037014005007222,
-      "memory_rss_bytes": 21659648,
-      "p_value": null,
+      "mean_seconds": 0.009058208142960211,
+      "memory_rss_bytes": 21872640,
+      "p_value": 0.037692109460709305,
       "runtime": "cpython",
       "runtime_label": "CPython baseline",
-      "sample_count": 3,
+      "sample_count": 7,
+      "speedup_vs_baseline": 1.0170320503178247,
+      "startup_mean_seconds": 0.0137292,
+      "startup_stdev_seconds": 6.608857692521449e-05,
+      "stdev_seconds": 8.733162417563628e-06,
+      "warmup_count": 2,
+      "workload_class": "c-extension-dominated"
+    },
+    {
+      "benchmark": "dynamic_dispatch",
+      "compile_time_seconds": null,
+      "mean_seconds": 0.0025934822853222223,
+      "memory_rss_bytes": 21823488,
+      "p_value": null,
+      "runtime": "cpython-cinderx",
+      "runtime_label": "CPython + CinderX",
+      "sample_count": 7,
       "speedup_vs_baseline": 1.0,
-      "startup_mean_seconds": 0.021352333333333334,
-      "startup_stdev_seconds": 0.0007367498444745907,
-      "stdev_seconds": 7.681286853656806e-05,
-      "warmup_count": 1,
+      "startup_mean_seconds": 0.0137872,
+      "startup_stdev_seconds": 0.00011973387156523429,
+      "stdev_seconds": 4.277708208595599e-06,
+      "warmup_count": 2,
+      "workload_class": "interpreter-heavy-dynamic-dispatch"
+    },
+    {
+      "benchmark": "compute_numeric",
+      "compile_time_seconds": null,
+      "mean_seconds": 0.01379193442802976,
+      "memory_rss_bytes": 21626880,
+      "p_value": null,
+      "runtime": "cpython-cinderx",
+      "runtime_label": "CPython + CinderX",
+      "sample_count": 7,
+      "speedup_vs_baseline": 1.0,
+      "startup_mean_seconds": 0.0137872,
+      "startup_stdev_seconds": 0.00011973387156523429,
+      "stdev_seconds": 3.2130253341391484e-05,
+      "warmup_count": 2,
+      "workload_class": "compute-bound-numeric"
+    },
+    {
+      "benchmark": "serialization_json",
+      "compile_time_seconds": null,
+      "mean_seconds": 0.030278267713583773,
+      "memory_rss_bytes": 21905408,
+      "p_value": null,
+      "runtime": "cpython-cinderx",
+      "runtime_label": "CPython + CinderX",
+      "sample_count": 7,
+      "speedup_vs_baseline": 1.0,
+      "startup_mean_seconds": 0.0137872,
+      "startup_stdev_seconds": 0.00011973387156523429,
+      "stdev_seconds": 6.755792442426797e-05,
+      "warmup_count": 2,
+      "workload_class": "serialization-heavy"
+    },
+    {
+      "benchmark": "io_tempfile",
+      "compile_time_seconds": null,
+      "mean_seconds": 0.05238112514260657,
+      "memory_rss_bytes": 21708800,
+      "p_value": null,
+      "runtime": "cpython-cinderx",
+      "runtime_label": "CPython + CinderX",
+      "sample_count": 7,
+      "speedup_vs_baseline": 1.0,
+      "startup_mean_seconds": 0.0137872,
+      "startup_stdev_seconds": 0.00011973387156523429,
+      "stdev_seconds": 0.0005924905627070506,
+      "warmup_count": 2,
+      "workload_class": "io-bound"
+    },
+    {
+      "benchmark": "hashlib_sha256",
+      "compile_time_seconds": null,
+      "mean_seconds": 0.00921248799984044,
+      "memory_rss_bytes": 21725184,
+      "p_value": null,
+      "runtime": "cpython-cinderx",
+      "runtime_label": "CPython + CinderX",
+      "sample_count": 7,
+      "speedup_vs_baseline": 1.0,
+      "startup_mean_seconds": 0.0137872,
+      "startup_stdev_seconds": 0.00011973387156523429,
+      "stdev_seconds": 0.00019622025786639633,
+      "warmup_count": 2,
       "workload_class": "c-extension-dominated"
     }
   ],
-  "generated_at_utc": "2026-02-19T18:40:31.933971+00:00",
+  "generated_at_utc": "2026-02-20T03:55:27.549290+00:00",
   "limitations": [
-    "Smoke suite is for reproducibility/sanity checks and should not be treated as a full performance claim.",
-    "Cython/Numba/Codon adapters are declared but execution adapters remain workload-specific TODOs."
+    "Smoke suite is for reproducibility/sanity checks and should not be treated as a full performance claim."
   ],
-  "machine": "Alejandros-MacBook-Pro",
+  "machine": "Alejandros-MBP.attlocal.net",
   "metadata": {
-    "generated_at_utc": "2026-02-19T18:40:31.933971+00:00",
+    "generated_at_utc": "2026-02-20T03:55:27.549290+00:00",
     "guardrails": {
       "checks": [
         {
@@ -99,10 +178,10 @@
           "status": "info"
         },
         {
-          "detail": "1m load average: 9.92 (cpu_count=8)",
+          "detail": "1m load average: 4.08 (cpu_count=8)",
           "enforceable": true,
           "name": "background_load",
-          "status": "warn"
+          "status": "ok"
         },
         {
           "detail": "Turbo/boost state is not auto-detected; document manual setting in reports.",
@@ -115,38 +194,30 @@
           "enforceable": false,
           "name": "thermal_state",
           "status": "info"
-        },
-        {
-          "detail": "CI mode enabled: smoke-only quick pass; no public performance claims.",
-          "enforceable": false,
-          "name": "ci_mode",
-          "status": "ok"
         }
       ],
-      "enforceable_failures": [
-        "High background load detected; results may be noisy."
-      ]
+      "enforceable_failures": []
     },
     "host": {
       "architecture": "arm64",
       "cpu_logical_count": 8,
       "cpu_model": "Apple M1",
-      "kernel": "25.2.0",
+      "kernel": "25.3.0",
       "os": "Darwin",
       "ram_total_bytes": 8589934592
     },
-    "machine": "Alejandros-MacBook-Pro",
+    "machine": "Alejandros-MBP.attlocal.net",
     "run_config": {
-      "ci_mode": true,
-      "require_cinderx_baseline": false,
-      "samples": 3,
-      "startup_samples": 3,
-      "warmups": 1
+      "ci_mode": false,
+      "require_cinderx_baseline": true,
+      "samples": 7,
+      "startup_samples": 5,
+      "warmups": 2
     },
-    "run_id": "20260219T184031Z",
+    "run_id": "20260220T035527Z",
     "suite": "smoke",
     "toolchain": {
-      "benchmark_repo_sha": "unknown",
+      "benchmark_repo_sha": "cc25230501554b4c3908207be9731910e8ba915b",
       "cinderx_upstream": {
         "clone_timestamp_utc": "2026-02-19T15:53:52.396865+00:00",
         "commit_sha": "31bca9f3156b78cca3c6b36000c42c48f5ddf037",
@@ -154,7 +225,7 @@
       }
     }
   },
-  "run_id": "20260219T184031Z",
+  "run_id": "20260220T035527Z",
   "runtimes": [
     {
       "executed": true,
@@ -170,17 +241,29 @@
       "runtime_label": "CPython baseline",
       "runtime_source": "required",
       "runtime_version": "Python 3.14.3 (main, Feb 12 2026, 00:29:58) [Clang 21.1.4 ]",
-      "startup_mean_seconds": 0.021352333333333334,
-      "startup_stdev_seconds": 0.0007367498444745907
+      "startup_mean_seconds": 0.0137292,
+      "startup_stdev_seconds": 6.608857692521449e-05
+    },
+    {
+      "executed": true,
+      "runtime": "cpython-cinderx",
+      "runtime_details": {
+        "abiflags": "",
+        "build": "('main', 'Feb 12 2026 00:29:58')",
+        "compiler": "Clang 21.1.4 ",
+        "config_args": "'--build=aarch64-apple-darwin' '--host=aarch64-apple-darwin' '--prefix=/install' '--with-openssl=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps' '--with-system-expat' '--with-system-libmpdec' '--without-ensurepip' '--with-tail-call-interp' '--enable-shared' '--with-mimalloc' '--enable-optimizations' '--enable-experimental-jit=yes-off' '--with-lto' '--with-build-python=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/host/bin/python3.14' 'ac_cv_lib_intl_textdomain=no' 'ac_cv_func_ptsname_r=no' 'ac_cv_func_explicit_bzero=no' '--with-dbmliborder=ndbm' 'build_alias=aarch64-apple-darwin' 'host_alias=aarch64-apple-darwin' 'PKG_CONFIG=pkg-config --static' 'PKG_CONFIG_PATH=/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps/share/pkgconfig:/var/folders/1r/b8l6nzhj4zdbz5jmjdhqbprw0000gn/T/tmp_ctmd7ry/tools/deps/lib/pkgconfig' 'CC=clang' 'CFLAGS=-O3 -arch arm64 -mmacosx-version-min=11.0 -Wno-nullability-completeness -Wno-expansion-to-defined -Wno-undef-prefix -fPIC -Werror=unguarded-availability-new' 'LDFLAGS=-arch arm64 -mmacosx-version-min=11.0 -LModules/_hacl -Wl,-headerpad,40' 'CPPFLAGS=-O3 -arch arm64 -mmacosx-version-min=11.0 -Wno-nullability-completeness -Wno-expansion-to-defined -Wno-undef-prefix -fPIC -Werror=unguarded-availability-new' 'PROFILE_TASK=-m test --pgo --ignore test_json'",
+        "implementation": "CPython",
+        "version": "3.14.3"
+      },
+      "runtime_label": "CPython + CinderX",
+      "runtime_source": "provided",
+      "runtime_version": "Python 3.14.3 (main, Feb 12 2026, 00:29:58) [Clang 21.1.4 ]",
+      "startup_mean_seconds": 0.0137872,
+      "startup_stdev_seconds": 0.00011973387156523429
     }
   ],
   "skipped_runtimes": [
-    "cpython-cinderx: not provided",
-    "pypy: not provided",
-    "nuitka: not provided",
-    "cython: not provided",
-    "numba: not provided",
-    "codon: not provided"
+    "pypy: not provided"
   ],
   "suite": "smoke",
   "workload_taxonomy": [

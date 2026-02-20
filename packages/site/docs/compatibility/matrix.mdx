@@ -8,7 +8,7 @@ This matrix combines upstream constraints with this repo's operational policy.
 
 | Area                                      | Status                     | Evidence                                                       | Notes                                                          |
 | ----------------------------------------- | -------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
-| Stock CPython baseline                    | Confirmed                  | [CinderX README](https://github.com/facebookincubator/cinderx) | CPython 3.14+ is required.                                     |
+| CinderX runtime host requirement          | Confirmed                  | [CinderX README](https://github.com/facebookincubator/cinderx) | CinderX targets stock CPython 3.14+ host interpreters.         |
 | Linux x86_64 support                      | Confirmed                  | [CinderX README](https://github.com/facebookincubator/cinderx) | Primary supported environment for external users.              |
 | macOS support                             | Confirmed with limitations | [CinderX README](https://github.com/facebookincubator/cinderx) | Build/import may work, but most features are disabled.         |
 | Windows support                           | Not supported              | [CinderX README](https://github.com/facebookincubator/cinderx) | Upstream says Windows is not yet supported.                    |
@@ -26,7 +26,8 @@ We separate:
 - measured behavior in this repository's benchmark outputs,
 - unknowns that still require reproduction.
 
-Where behavior is unknown for external workloads, we mark it as TODO/hypothesis until backed by:
+Where behavior is unknown for external workloads, we mark it as an open question/hypothesis until
+backed by:
 
 - upstream code/tests, or
 - reproducible benchmark or compatibility results in this repository.

@@ -9,7 +9,7 @@ VENV_STAMP := $(VENV_DIR)/.ready
 SUMMARY_DIR := data/summary
 STATIC_SUMMARY_DIR := packages/site/static/data/summary
 
-.PHONY: dev fmt lint test build clean python-dev python-dev-cinderx cinderx-env-check cinderx-install-local bench-toolchain bench-smoke-local bench-smoke-local-cinderx bench-pyperformance-local bench-pyperformance-local-cinderx bench-publish-check bench-publish-check-smoke bench-dossier bench-dossier-smoke
+.PHONY: dev fmt lint test build clean python-dev python-dev-cinderx cinderx-env-check cinderx-install-local cinderx-install-local-macos bench-toolchain bench-toolchain-compare bench-smoke-local bench-smoke-local-cinderx bench-pyperformance-local bench-pyperformance-local-cinderx bench-publish-check bench-publish-check-smoke bench-dossier bench-dossier-smoke bench-run-quickstart-matrix bench-sync-site-data
 
 $(VENV_STAMP): $(PY_DIR)/pyproject.toml
 	$(UV) python install $(PYTHON_VERSION)
@@ -38,8 +38,17 @@ cinderx-install-local: python-dev
 	$(UV) pip install --python $(VENV_DIR)/bin/python setuptools
 	$(UV) pip install --python $(VENV_DIR)/bin/python --no-build-isolation cinderx
 
+cinderx-install-local-macos: python-dev
+	@if [ "$$(uname -s)" != "Darwin" ] || [ "$$(uname -m)" != "arm64" ]; then \
+		echo "warning: macOS arm64 workaround target was requested on a non-macOS-arm64 host"; \
+	fi
+	CXXFLAGS='-include cstdlib' CMAKE_ARGS='-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON' $(UV) pip install --python $(VENV_DIR)/bin/python -v --no-cache-dir --reinstall cinderx
+
 bench-toolchain: python-dev
-	$(UV) pip install --python $(VENV_DIR)/bin/python pyperformance nuitka
+	$(UV) pip install --python $(VENV_DIR)/bin/python pyperformance
+
+bench-toolchain-compare: python-dev
+	bash scripts/bench/install_comparison_toolchain.sh
 
 dev:
 	$(PNPM) -C $(SITE_DIR) install
@@ -89,6 +98,12 @@ bench-dossier: python-dev
 
 bench-dossier-smoke: python-dev
 	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench export-dossier --summary-root ../$(SUMMARY_DIR) --output-root ../$(SUMMARY_DIR)/reports --require-suite smoke
+
+bench-run-quickstart-matrix: python-dev
+	bash scripts/bench/run_quickstart_matrix.sh
+
+bench-sync-site-data:
+	bash scripts/bench/sync_site_data_from_bench_results.sh
 
 clean:
 	rm -rf $(SITE_DIR)/build $(SITE_DIR)/.docusaurus $(SITE_DIR)/.cache

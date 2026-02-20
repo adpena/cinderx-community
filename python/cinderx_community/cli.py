@@ -188,8 +188,8 @@ def bench_run(
         bool,
         typer.Option(
             help=(
-                "Require --cpython-cinderx for comparison runs so fallback CPython baselines "
-                "are not published as primary comparisons."
+                "Enforce CinderX as the primary comparison baseline for publishable runs. "
+                "Requires --cpython-cinderx so CPython-only fallback summaries are non-publishable."
             ),
         ),
     ] = False,
@@ -206,25 +206,10 @@ def bench_run(
         Path | None,
         typer.Option(file_okay=True, dir_okay=False, help="Optional PyPy executable."),
     ] = None,
-    nuitka: Annotated[
-        Path | None,
-        typer.Option(file_okay=True, dir_okay=False, help="Optional Nuitka executable."),
-    ] = None,
-    cython: Annotated[
-        Path | None,
-        typer.Option(file_okay=True, dir_okay=False, help="Optional Cython executable."),
-    ] = None,
-    numba: Annotated[
-        Path | None,
-        typer.Option(file_okay=True, dir_okay=False, help="Optional Numba executable."),
-    ] = None,
-    codon: Annotated[
-        Path | None,
-        typer.Option(file_okay=True, dir_okay=False, help="Optional Codon executable."),
-    ] = None,
 ) -> None:
     """Run benchmark suites or print execution plans for not-yet-automated suites."""
-    if suite not in {SMOKE_SUITE, PYPERFORMANCE_SUITE}:
+    runnable_suites = {SMOKE_SUITE, PYPERFORMANCE_SUITE}
+    if suite not in runnable_suites:
         try:
             plan = build_plan(suite=suite, python_executable=python)
         except ValueError as exc:
@@ -245,10 +230,6 @@ def bench_run(
                 require_cinderx_baseline=require_cinderx_baseline,
                 cpython_cinderx=cpython_cinderx,
                 pypy=pypy,
-                nuitka=nuitka,
-                cython=cython,
-                numba=numba,
-                codon=codon,
                 static_summary_root=static_summary_out,
             )
         else:
@@ -262,10 +243,6 @@ def bench_run(
                 require_cinderx_baseline=require_cinderx_baseline,
                 cpython_cinderx=cpython_cinderx,
                 pypy=pypy,
-                nuitka=nuitka,
-                cython=cython,
-                numba=numba,
-                codon=codon,
                 static_summary_root=static_summary_out,
             )
     except ValueError as exc:

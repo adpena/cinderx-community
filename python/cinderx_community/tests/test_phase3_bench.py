@@ -7,7 +7,12 @@ from pathlib import Path
 
 from cinderx_community import upstream
 from cinderx_community.bench import runner
-from cinderx_community.bench.runner import PYPERFORMANCE_SUITE, SMOKE_SUITE, build_plan, list_suites
+from cinderx_community.bench.runner import (
+    PYPERFORMANCE_SUITE,
+    SMOKE_SUITE,
+    build_plan,
+    list_suites,
+)
 
 
 def _publishable_summary_payload(*, suite: str) -> dict[str, object]:
@@ -254,64 +259,6 @@ def test_cinderx_runtime_becomes_baseline_when_provided(tmp_path: Path, monkeypa
     assert all(row["speedup_vs_baseline"] == 1.0 for row in cinderx_rows)
 
 
-def test_run_smoke_suite_executes_nuitka_adapter_when_provided(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(upstream, "PINS_FILE", tmp_path / "pins.toml")
-
-    fake_nuitka = tmp_path / "fake-nuitka"
-    fake_nuitka.write_text("#!/bin/sh\n", encoding="utf-8")
-    fake_nuitka.chmod(0o755)
-
-    original_run_command = runner._run_command
-
-    def fake_run_command(
-        args: list[str], *, timeout_s: int = 90
-    ) -> subprocess.CompletedProcess[str]:
-        if args and args[0] == str(fake_nuitka):
-            output_dir_arg = next(
-                (item for item in args if item.startswith("--output-dir=")),
-                None,
-            )
-            if output_dir_arg is None:
-                return subprocess.CompletedProcess(
-                    args=args,
-                    returncode=0,
-                    stdout="Nuitka 4.0.1",
-                    stderr="",
-                )
-            output_dir = Path(output_dir_arg.split("=", maxsplit=1)[1])
-            compiled = output_dir / "smoke-worker"
-            compiled.write_text("#!/bin/sh\n", encoding="utf-8")
-            compiled.chmod(0o755)
-            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
-        if args and args[0].endswith("smoke-worker"):
-            payload = {"warmups": [], "samples": [0.01], "rss_max_bytes": 4096}
-            return subprocess.CompletedProcess(
-                args=args,
-                returncode=0,
-                stdout=json.dumps(payload),
-                stderr="",
-            )
-        return original_run_command(args, timeout_s=timeout_s)
-
-    monkeypatch.setattr(runner, "_run_command", fake_run_command)
-
-    result = runner.run_smoke_suite(
-        python=Path(sys.executable),
-        nuitka=fake_nuitka,
-        out_root=tmp_path / "runs",
-        summary_root=tmp_path / "summary",
-        machine="nuitka-adapter-test",
-        ci_mode=True,
-        sample_count=1,
-        warmup_count=0,
-    )
-
-    summary = json.loads(Path(result.summary_path).read_text(encoding="utf-8"))
-    nuitka_rows = [row for row in summary["benchmarks"] if row["runtime"] == "nuitka"]
-    assert nuitka_rows
-    assert all(row["compile_time_seconds"] is not None for row in nuitka_rows)
-
-
 def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(upstream, "PINS_FILE", tmp_path / "pins.toml")
 
@@ -465,6 +412,80 @@ def test_verify_publishable_summaries_accepts_cinderx_published_payloads(tmp_pat
     )
     assert result.suites_checked == [SMOKE_SUITE, PYPERFORMANCE_SUITE]
     assert any("CinderX-baselined" in note for note in result.notes)
+
+
+def test_verify_publishable_summaries_rejects_cross_suite_machine_mismatch(tmp_path: Path) -> None:
+    summary_root = tmp_path / "summary"
+    summary_root.mkdir(parents=True, exist_ok=True)
+
+    smoke_payload = _publishable_summary_payload(suite=SMOKE_SUITE)
+    pyperf_payload = _publishable_summary_payload(suite=PYPERFORMANCE_SUITE)
+    pyperf_payload["machine"] = "other-host"
+
+    (summary_root / "latest-smoke.json").write_text(json.dumps(smoke_payload), encoding="utf-8")
+    (summary_root / "latest-pyperformance.json").write_text(
+        json.dumps(pyperf_payload),
+        encoding="utf-8",
+    )
+    _write_index(
+        summary_root / "index.json",
+        suites=[SMOKE_SUITE, PYPERFORMANCE_SUITE],
+        latest_file_by_suite={
+            SMOKE_SUITE: "latest-smoke.json",
+            PYPERFORMANCE_SUITE: "latest-pyperformance.json",
+        },
+    )
+
+    try:
+        runner.verify_publishable_summaries(summary_root=summary_root)
+    except ValueError as exc:
+        assert "machine mismatch" in str(exc)
+    else:
+        raise AssertionError("Expected publish verification failure for suite machine mismatch")
+
+
+def test_verify_publishable_summaries_rejects_unsupported_runtime_rows(tmp_path: Path) -> None:
+    summary_root = tmp_path / "summary"
+    summary_root.mkdir(parents=True, exist_ok=True)
+
+    smoke_payload = _publishable_summary_payload(suite=SMOKE_SUITE)
+    runtimes = smoke_payload.get("runtimes")
+    assert isinstance(runtimes, list)
+    runtimes.append(
+        {
+            "runtime": "unsupported-runtime",
+            "runtime_label": "Unsupported runtime",
+            "runtime_version": "0.0",
+            "runtime_details": {},
+            "executed": False,
+        }
+    )
+    benchmarks = smoke_payload.get("benchmarks")
+    assert isinstance(benchmarks, list)
+    benchmarks.append(
+        {
+            "benchmark": "dynamic_dispatch",
+            "runtime": "unsupported-runtime",
+            "speedup_vs_baseline": None,
+        }
+    )
+
+    (summary_root / "latest-smoke.json").write_text(json.dumps(smoke_payload), encoding="utf-8")
+    _write_index(
+        summary_root / "index.json",
+        suites=[SMOKE_SUITE],
+        latest_file_by_suite={SMOKE_SUITE: "latest-smoke.json"},
+    )
+
+    try:
+        runner.verify_publishable_summaries(
+            summary_root=summary_root,
+            suites=[SMOKE_SUITE],
+        )
+    except ValueError as exc:
+        assert "unsupported runtime key(s)" in str(exc)
+    else:
+        raise AssertionError("Expected publish verification failure for unsupported runtime rows")
 
 
 def test_verify_publishable_summaries_rejects_static_mismatch(tmp_path: Path) -> None:

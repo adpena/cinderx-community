@@ -57,6 +57,13 @@ type SummaryIndex = {
   entries: SummaryIndexEntry[];
 };
 
+type PublishedRunRow = SummaryIndexEntry & {
+  baselineRuntime: string;
+  policyEnforced: boolean;
+  ciMode: boolean;
+  cinderxBaselined: boolean;
+};
+
 type ViewMode = 'runtime' | 'vs-cinderx';
 
 type CinderxComparisonRow = {
@@ -106,6 +113,7 @@ export default function BenchSummaryDashboard() {
   const [index, setIndex] = useState<SummaryIndex | null>(null);
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [summary, setSummary] = useState<SmokeSummary | null>(null);
+  const [publishedRuns, setPublishedRuns] = useState<PublishedRunRow[]>([]);
   const [selectedRuntime, setSelectedRuntime] = useState<string>('');
   const [comparisonRuntime, setComparisonRuntime] = useState<string>('');
   const [selectedWorkload, setSelectedWorkload] = useState<string>('all');
@@ -141,6 +149,56 @@ export default function BenchSummaryDashboard() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!index) {
+      setPublishedRuns([]);
+      return;
+    }
+
+    let active = true;
+    const maxRows = 12;
+    const entries = index.entries.slice(0, maxRows);
+
+    Promise.all(
+      entries.map(async (entry) => {
+        try {
+          const response = await fetch(`/data/summary/${entry.file}`);
+          if (!response.ok) {
+            throw new Error('summary load failed');
+          }
+          const payload = (await response.json()) as SmokeSummary;
+          const baselineRuntime =
+            typeof payload.baseline_runtime === 'string' ? payload.baseline_runtime : 'unknown';
+          const policyEnforced = Boolean(payload.metadata?.run_config?.require_cinderx_baseline);
+          const ciMode = Boolean(payload.metadata?.run_config?.ci_mode);
+          return {
+            ...entry,
+            baselineRuntime,
+            policyEnforced,
+            ciMode,
+            cinderxBaselined: baselineRuntime === 'cpython-cinderx'
+          } satisfies PublishedRunRow;
+        } catch {
+          return {
+            ...entry,
+            baselineRuntime: 'unavailable',
+            policyEnforced: false,
+            ciMode: false,
+            cinderxBaselined: false
+          } satisfies PublishedRunRow;
+        }
+      })
+    ).then((rows) => {
+      if (active) {
+        setPublishedRuns(rows);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [index]);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -425,6 +483,38 @@ export default function BenchSummaryDashboard() {
           <strong>Baseline:</strong> {summary.baseline_runtime}
         </p>
       </div>
+
+      <h3>Published runs</h3>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th>Generated (UTC)</th>
+            <th>Suite</th>
+            <th>Run ID</th>
+            <th>Machine</th>
+            <th>Baseline</th>
+            <th>Policy</th>
+            <th>Mode</th>
+          </tr>
+        </thead>
+        <tbody>
+          {publishedRuns.map((run) => (
+            <tr key={`published-run-${run.file}`}>
+              <td>{run.generated_at_utc}</td>
+              <td>{run.suite}</td>
+              <td>{run.run_id}</td>
+              <td>{run.machine}</td>
+              <td>
+                <span className={run.cinderxBaselined ? styles.flagGood : styles.flagWarn}>
+                  {run.baselineRuntime}
+                </span>
+              </td>
+              <td>{run.policyEnforced ? 'enforced' : 'not-enforced'}</td>
+              <td>{run.ciMode ? 'ci-shape' : 'full'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       {!cinderxBaseline ? (
         <p className={styles.warning}>

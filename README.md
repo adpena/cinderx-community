@@ -16,7 +16,8 @@ Documentation in this repo is grounded in these sources:
 - Meta engineering post on CPython 3.12 hooks: https://engineering.fb.com/2023/10/05/developer-tools/python-312-meta-new-features/
 - pyperformance docs: https://pyperformance.readthedocs.io/
 
-When a claim is not fully validated by those sources, we mark it explicitly as TODO/hypothesis.
+When a claim is not fully validated by those sources, we mark it explicitly as an open
+question/hypothesis.
 
 ## Monorepo Layout
 
@@ -112,7 +113,6 @@ cd python
   --python ../.venv/bin/python \
   --cpython-cinderx /path/to/cinderx-python \
   --pypy "$(which pypy3)" \
-  --nuitka "$(which nuitka)" \
   --require-cinderx-baseline \
   --out ../data/runs \
   --summary-out ../data/summary \
@@ -126,14 +126,15 @@ This writes:
 - normalized summary JSON under `data/summary/`
 - static-site summary mirror under `packages/site/static/data/summary/`
 
-Use additional runtime flags (for example `--pypy` and `--nuitka`) as optional comparators against
-the CinderX baseline.
+Use additional runtime flags (for example `--pypy`) as optional comparators against the CinderX
+baseline in `smoke`.
+`pyperformance` comparisons are interpreter-runtime only (`cpython`, `cpython-cinderx`, `pypy`).
 `--cpython-cinderx` is validated at runtime; if the interpreter does not expose CinderX
 (`import cinderx`), the run fails to prevent mislabeled comparison baselines.
 Install benchmark toolchain extras with:
 
 ```bash
-uv pip install --python .venv/bin/python pyperformance nuitka
+uv pip install --python .venv/bin/python pyperformance
 ```
 
 To install the optional package metadata path for CinderX in this project:
@@ -143,8 +144,8 @@ uv add --project ./python --optional cinderx cinderx --no-sync
 uv pip install --python .venv/bin/python -e ./python[dev,cinderx]
 ```
 
-Note: CinderX installation is platform/toolchain dependent; on macOS arm64, local source builds may
-currently fail upstream without additional native build prerequisites.
+Note: CinderX installation is platform/toolchain dependent; on macOS arm64, default local source
+builds may fail in bundled `fmt` (`malloc` / `free` undeclared).
 
 Before trying CinderX-baselined runs, check environment readiness:
 
@@ -158,6 +159,18 @@ Attempt local CinderX install:
 make cinderx-install-local
 ```
 
+If you hit the macOS arm64 `fmt` compile failure, use the workaround path:
+
+```bash
+make cinderx-install-local-macos
+```
+
+Equivalent direct command:
+
+```bash
+CXXFLAGS='-include cstdlib' CMAKE_ARGS='-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON' uv pip install --python .venv/bin/python -v --no-cache-dir --reinstall cinderx
+```
+
 Convenience targets for local benchmark runs:
 
 ```bash
@@ -165,6 +178,22 @@ make bench-smoke-local
 make bench-pyperformance-local
 CINDERX_PYTHON=/path/to/cinderx-python make bench-smoke-local-cinderx
 CINDERX_PYTHON=/path/to/cinderx-python make bench-pyperformance-local-cinderx
+```
+
+Script-first helpers are also available:
+
+```bash
+bash scripts/bench/install_comparison_toolchain.sh
+bash scripts/bench/run_quickstart_matrix.sh
+bash scripts/bench/sync_site_data_from_bench_results.sh
+```
+
+Equivalent make wrappers:
+
+```bash
+make bench-toolchain-compare
+make bench-run-quickstart-matrix
+make bench-sync-site-data
 ```
 
 Before publishing benchmark artifacts, run the guard command:
@@ -211,7 +240,7 @@ make bench-dossier
 ## Development Notes
 
 - This repo intentionally does **not** vendor the upstream CinderX source tree.
-- Runnable benchmark suites are `smoke` and `pyperformance`; additional suites remain phased/TODO.
+- Runnable benchmark suites are `smoke` and `pyperformance`; additional suites remain roadmap-scoped.
 - Continuous benchmark automation is defined in `.github/workflows/benchmarks.yml` and now attempts
   hosted-runner CinderX installation automatically (with CI-shape fallback when unavailable).
 

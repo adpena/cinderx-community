@@ -15,6 +15,7 @@ PY
 
 This verifies package import only. It does not confirm specific JIT/static features.
 
-:::caution TODO
-Feature-level verification is tracked as future work and will be backed by source reading and differential tests.
+:::caution Validation scope
+Feature-level verification should use the compatibility guides and benchmark verification commands,
+not this import-only smoke check.
 :::

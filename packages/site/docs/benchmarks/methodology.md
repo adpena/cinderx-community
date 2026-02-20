@@ -22,12 +22,13 @@ Source: [pyperformance documentation](https://pyperformance.readthedocs.io/)
 
 - `smoke` mode: fast sanity checks with reduced samples; suitable for CI gates and output-shape validation.
 - `pyperformance` mode: real pyperformance execution with normalized ingestion and per-benchmark stats.
+- pyperformance comparator scope is interpreter runtimes only (`cpython`, `cpython-cinderx`, `pypy`).
 - CI fast mode for pyperformance currently scopes to a representative benchmark subset (`nbody`) to keep
   validation runs practical.
 - `--cpython-cinderx` is strictly validated; if the runtime does not expose CinderX (`import cinderx`),
   the run fails instead of labeling it as a CinderX baseline.
 
-Example smoke run with CinderX baseline plus comparison runtimes:
+Example smoke run with CinderX baseline plus interpreter comparison runtime:
 
 ```bash
 cxc bench run \
@@ -35,7 +36,6 @@ cxc bench run \
   --python /path/to/python3.14 \
   --cpython-cinderx /path/to/cinderx-python \
   --pypy /path/to/pypy3 \
-  --nuitka /path/to/nuitka \
   --require-cinderx-baseline \
   --ci-mode
 ```
@@ -68,7 +68,8 @@ Each summary includes:
 
 Use `cxc bench verify-publish` before publishing benchmark artifacts. It fails unless required
 latest summaries are truly CinderX-baselined and policy-enforced.
-It also enforces that host/toolchain/guardrail metadata is present for report transparency.
+It also enforces that host/toolchain/guardrail metadata is present and that required suites are
+coherent (same run id/machine/repo SHA with bounded timestamp skew).
 
 ## Local publish path
 
