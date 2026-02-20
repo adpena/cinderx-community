@@ -23,8 +23,8 @@ Source: [pyperformance documentation](https://pyperformance.readthedocs.io/)
 - `smoke` mode: fast sanity checks with reduced samples; suitable for CI gates and output-shape validation.
 - `pyperformance` mode: real pyperformance execution with normalized ingestion and per-benchmark stats.
 - pyperformance comparator scope is interpreter runtimes only (`cpython`, `cpython-cinderx`, `pypy`).
-- CI fast mode for pyperformance currently scopes to a representative benchmark subset (`nbody`) to keep
-  validation runs practical.
+- CI fast mode for pyperformance can be used for local/debug validation, but publishable headline data must
+  come from full pyperformance runs (`ci_mode=false`).
 - `--cpython-cinderx` is strictly validated; if the runtime does not expose CinderX (`import cinderx`),
   the run fails instead of labeling it as a CinderX baseline.
 
@@ -66,10 +66,15 @@ Each summary includes:
 
 ## Publish guard
 
-Use `cxc bench verify-publish` before publishing benchmark artifacts. It fails unless required
-latest summaries are truly CinderX-baselined and policy-enforced.
-It also enforces that host/toolchain/guardrail metadata is present and that required suites are
-coherent (same run id/machine/repo SHA with bounded timestamp skew).
+Use `cxc bench verify-publish` before publishing benchmark artifacts. For headline publishing, require
+`pyperformance` and fail CI-mode outputs:
+
+```bash
+cxc bench verify-publish --require-suite pyperformance
+```
+
+It fails unless latest summaries are truly CinderX-baselined and policy-enforced, and host/toolchain/
+guardrail metadata is present.
 
 ## Local publish path
 
@@ -77,5 +82,5 @@ Local benchmark publication is supported when you:
 
 - run with a real CinderX runtime (`--cpython-cinderx`) and `--require-cinderx-baseline`
 - keep full metadata in the generated summaries
-- pass `cxc bench verify-publish` (use `--require-suite smoke` for smoke-only local publications)
+- pass `cxc bench verify-publish --require-suite pyperformance`
 - export metadata dossiers with `cxc bench export-dossier` (or `make bench-dossier`) for report attachment

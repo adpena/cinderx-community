@@ -202,7 +202,8 @@ Before publishing benchmark artifacts, run the guard command:
 cd python
 ../.venv/bin/cxc bench verify-publish \
   --summary-root ../data/summary \
-  --static-summary-root ../packages/site/static/data/summary
+  --static-summary-root ../packages/site/static/data/summary \
+  --require-suite pyperformance
 ```
 
 Or run the wired target directly:
@@ -212,20 +213,19 @@ make bench-publish-check
 ```
 
 You can run publishable benchmarks locally (no self-hosted CI required) as long as the run is
-CinderX-baselined and metadata-rich. For smoke-only local publishes, scope the guard:
+CinderX-baselined, metadata-rich, and full pyperformance (non-`ci_mode`):
 
 ```bash
 cd python
 ../.venv/bin/cxc bench verify-publish \
   --summary-root ../data/summary \
   --static-summary-root ../packages/site/static/data/summary \
-  --require-suite smoke
+  --require-suite pyperformance
 ```
 
 To include configuration details in reports, export metadata snapshots:
 
 ```bash
-jq '.metadata' data/summary/latest-smoke.json > data/summary/latest-smoke.metadata.json
 jq '.metadata' data/summary/latest-pyperformance.json > data/summary/latest-pyperformance.metadata.json
 ```
 
@@ -233,7 +233,7 @@ Or use the wired dossier command/targets:
 
 ```bash
 cd python
-../.venv/bin/cxc bench export-dossier --summary-root ../data/summary --output-root ../data/summary/reports
+../.venv/bin/cxc bench export-dossier --summary-root ../data/summary --output-root ../data/summary/reports --require-suite pyperformance
 make bench-dossier
 ```
 
@@ -242,7 +242,8 @@ make bench-dossier
 - This repo intentionally does **not** vendor the upstream CinderX source tree.
 - Runnable benchmark suites are `smoke` and `pyperformance`; additional suites remain roadmap-scoped.
 - Continuous benchmark automation is defined in `.github/workflows/benchmarks.yml` and now attempts
-  hosted-runner CinderX installation automatically (with CI-shape fallback when unavailable).
+  hosted-runner CinderX installation automatically.
+- Smoke runs are debug-only diagnostics; canonical published results are full pyperformance.
 
 ## License
 

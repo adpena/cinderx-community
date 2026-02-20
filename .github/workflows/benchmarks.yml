@@ -3,10 +3,10 @@ name: Benchmarks
 on:
   workflow_dispatch:
     inputs:
-      run_pyperformance:
-        description: Run pyperformance suite in addition to smoke
+      run_smoke_diagnostics:
+        description: Run debug-only smoke diagnostics on ubuntu-latest
         required: false
-        default: true
+        default: false
         type: boolean
   schedule:
     - cron: '0 8 * * 1'
@@ -16,7 +16,8 @@ permissions:
 
 jobs:
   benchmark:
-    name: Smoke + Optional PyPerformance (Diagnostics only)
+    name: Smoke Diagnostics (Manual debug only)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_smoke_diagnostics == true }}
     runs-on: ubuntu-latest
 
     steps:
@@ -100,31 +101,12 @@ jobs:
             --summary-out data/summary \
             --static-summary-out packages/site/static/data/summary
 
-      - name: Run pyperformance suite
-        if: ${{ github.event_name == 'schedule' || inputs.run_pyperformance == true }}
-        run: |
-          .venv/bin/cxc bench run \
-            --suite pyperformance \
-            --python "${{ steps.runtimes.outputs.python_bin }}" \
-            --ci-mode \
-            --out data/runs \
-            --summary-out data/summary \
-            --static-summary-out packages/site/static/data/summary
-
       - name: Export metadata dossier (smoke only)
-        if: ${{ !(github.event_name == 'schedule' || inputs.run_pyperformance == true) }}
         run: |
           .venv/bin/cxc bench export-dossier \
             --summary-root data/summary \
             --output-root data/summary/reports \
             --require-suite smoke
-
-      - name: Export metadata dossier (smoke + pyperformance)
-        if: ${{ github.event_name == 'schedule' || inputs.run_pyperformance == true }}
-        run: |
-          .venv/bin/cxc bench export-dossier \
-            --summary-root data/summary \
-            --output-root data/summary/reports
 
       - name: Upload diagnostics CI-shape artifacts
         uses: actions/upload-artifact@v4
@@ -137,7 +119,7 @@ jobs:
   benchmark_pinned_publishable:
     name: Publishable CinderX Baseline (Pinned ubuntu-22.04 + CPython 3.14.0)
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 240
 
     steps:
       - name: Checkout
@@ -182,41 +164,30 @@ jobs:
           rm -rf data/runs data/summary packages/site/static/data/summary
           mkdir -p data/runs data/summary packages/site/static/data/summary
 
-      - name: Run smoke suite (publishable)
-        run: |
-          .venv/bin/cxc bench run \
-            --suite smoke \
-            --python "${{ steps.cinderx_strict.outputs.python_bin }}" \
-            --cpython-cinderx "${{ steps.cinderx_strict.outputs.cinderx_bin }}" \
-            --require-cinderx-baseline \
-            --ci-mode \
-            --out data/runs \
-            --summary-out data/summary \
-            --static-summary-out packages/site/static/data/summary
-
-      - name: Run pyperformance suite (publishable)
+      - name: Run pyperformance suite (publishable full)
         run: |
           .venv/bin/cxc bench run \
             --suite pyperformance \
             --python "${{ steps.cinderx_strict.outputs.python_bin }}" \
             --cpython-cinderx "${{ steps.cinderx_strict.outputs.cinderx_bin }}" \
             --require-cinderx-baseline \
-            --ci-mode \
             --out data/runs \
             --summary-out data/summary \
             --static-summary-out packages/site/static/data/summary
 
-      - name: Verify publish guard (smoke + pyperformance)
+      - name: Verify publish guard (pyperformance)
         run: |
           .venv/bin/cxc bench verify-publish \
             --summary-root data/summary \
-            --static-summary-root packages/site/static/data/summary
+            --static-summary-root packages/site/static/data/summary \
+            --require-suite pyperformance
 
-      - name: Export metadata dossier (smoke + pyperformance)
+      - name: Export metadata dossier (pyperformance)
         run: |
           .venv/bin/cxc bench export-dossier \
             --summary-root data/summary \
-            --output-root data/summary/reports
+            --output-root data/summary/reports \
+            --require-suite pyperformance
 
       - name: Upload publishable benchmark artifacts
         if: ${{ success() }}
@@ -284,43 +255,33 @@ jobs:
           fi
 
           curated_summary_dir="$(mktemp -d)"
-          for latest_name in latest-smoke.json latest-pyperformance.json; do
-            if [[ ! -f "${summary_root}/${latest_name}" ]]; then
-              echo "::error::Missing required publishable suite summary: ${summary_root}/${latest_name}"
-              exit 1
-            fi
-          done
-
-          smoke_run_id="$(jq -r '.run_id // empty' "${summary_root}/latest-smoke.json")"
-          pyperf_run_id="$(jq -r '.run_id // empty' "${summary_root}/latest-pyperformance.json")"
-          if [[ -z "${smoke_run_id}" || -z "${pyperf_run_id}" ]]; then
-            echo "::error::Run coherence check failed: missing run_id in latest summary payload."
+          pyperf_latest="${summary_root}/latest-pyperformance.json"
+          if [[ ! -f "${pyperf_latest}" ]]; then
+            echo "::error::Missing required publishable suite summary: ${pyperf_latest}"
             exit 1
           fi
 
-          smoke_machine="$(jq -r '.machine // empty' "${summary_root}/latest-smoke.json")"
-          pyperf_machine="$(jq -r '.machine // empty' "${summary_root}/latest-pyperformance.json")"
-          if [[ -z "${smoke_machine}" || -z "${pyperf_machine}" || "${smoke_machine}" != "${pyperf_machine}" ]]; then
-            echo "::error::Run coherence check failed: smoke machine (${smoke_machine:-missing}) != pyperformance machine (${pyperf_machine:-missing})."
+          pyperf_run_id="$(jq -r '.run_id // empty' "${pyperf_latest}")"
+          if [[ -z "${pyperf_run_id}" ]]; then
+            echo "::error::Missing run_id in latest-pyperformance.json."
             exit 1
           fi
 
-          smoke_generated_at="$(jq -r '.generated_at_utc // empty' "${summary_root}/latest-smoke.json")"
-          pyperf_generated_at="$(jq -r '.generated_at_utc // empty' "${summary_root}/latest-pyperformance.json")"
-          if [[ -z "${smoke_generated_at}" || -z "${pyperf_generated_at}" ]]; then
-            echo "::error::Run coherence check failed: missing generated_at_utc in latest summary payload."
+          pyperf_ci_mode="$(jq -r '.metadata.run_config.ci_mode // empty' "${pyperf_latest}")"
+          if [[ "${pyperf_ci_mode}" != "false" ]]; then
+            echo "::error::Publishable pyperformance summary is CI-mode (${pyperf_ci_mode}); expected full run (ci_mode=false)."
             exit 1
           fi
-          skew_seconds="$(python3 -c 'import datetime,sys; smoke=datetime.datetime.fromisoformat(sys.argv[1].replace("Z", "+00:00")); pyperf=datetime.datetime.fromisoformat(sys.argv[2].replace("Z", "+00:00")); print(abs((smoke-pyperf).total_seconds()))' "${smoke_generated_at}" "${pyperf_generated_at}")"
-          if ! awk "BEGIN { exit !(${skew_seconds} <= 3600) }"; then
-            echo "::error::Run coherence check failed: generated_at_utc skew ${skew_seconds}s exceeds 3600s."
+
+          pyperf_mode="$(jq -r '.metadata.run_config.pyperformance_mode // empty' "${pyperf_latest}")"
+          if [[ -n "${pyperf_mode}" && "${pyperf_mode}" != "default" ]]; then
+            echo "::error::Publishable pyperformance summary is not full mode (pyperformance_mode=${pyperf_mode})."
             exit 1
           fi
 
           if [[ -f "${summary_root}/index.json" ]]; then
             jq \
               --arg updated_at "${recorded_at}" \
-              --arg smoke_run_id "${smoke_run_id}" \
               --arg pyperf_run_id "${pyperf_run_id}" \
               '
               {
@@ -329,8 +290,6 @@ jobs:
                   (.entries // [])
                   | map(
                       select(
-                        (.suite == "smoke" and .run_id == $smoke_run_id)
-                        or
                         (.suite == "pyperformance" and .run_id == $pyperf_run_id)
                       )
                     )
@@ -343,13 +302,12 @@ jobs:
             exit 1
           fi
 
-          if ! jq -e '([.entries[]? | select(.suite == "smoke")] | length) >= 1 and ([.entries[]? | select(.suite == "pyperformance")] | length) >= 1' "${curated_summary_dir}/index.json" >/dev/null; then
-            echo "::error::Curated index missing smoke and/or pyperformance entries for current latest summaries."
+          if ! jq -e '([.entries[]? | select(.suite == "pyperformance")] | length) >= 1' "${curated_summary_dir}/index.json" >/dev/null; then
+            echo "::error::Curated index missing pyperformance entry for current latest summary."
             cat "${curated_summary_dir}/index.json"
             exit 1
           fi
 
-          cp "${summary_root}/latest-smoke.json" "${curated_summary_dir}/latest-smoke.json"
           cp "${summary_root}/latest-pyperformance.json" "${curated_summary_dir}/latest-pyperformance.json"
 
           mapfile -t selected_files < <(jq -r '.entries[]?.file // empty' "${curated_summary_dir}/index.json")
@@ -371,7 +329,6 @@ jobs:
           mkdir -p "${latest_dir}"
           cp -R "${curated_summary_dir}/." "${latest_dir}/"
 
-          smoke_latest_path="history/latest/latest-smoke.json"
           pyperf_latest_path="history/latest/latest-pyperformance.json"
 
           manifest="history/index.json"
@@ -391,7 +348,6 @@ jobs:
             --arg run_id "${GITHUB_RUN_ID}" \
             --arg sha "${GITHUB_SHA}" \
             --arg ref "${GITHUB_REF_NAME}" \
-            --arg suite_smoke "${smoke_latest_path}" \
             --arg suite_pyperf "${pyperf_latest_path}" \
             --arg run_summary_dir "${dest_summary_dir}" \
             '
@@ -404,7 +360,6 @@ jobs:
                     sha: $sha,
                     ref: $ref,
                     run_summary_dir: $run_summary_dir,
-                    latest_smoke_path: (if $suite_smoke == "" then null else $suite_smoke end),
                     latest_pyperformance_path: (if $suite_pyperf == "" then null else $suite_pyperf end)
                   }
                 ] + (.entries // [])

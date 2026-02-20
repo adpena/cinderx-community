@@ -89,5 +89,6 @@ For full publish guard checks:
 cd python
 ../.venv/bin/cxc bench verify-publish \
   --summary-root ../data/summary \
-  --static-summary-root ../packages/site/static/data/summary
+  --static-summary-root ../packages/site/static/data/summary \
+  --require-suite pyperformance
 ```

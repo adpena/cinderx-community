@@ -88,13 +88,13 @@ bench-pyperformance-local-cinderx: bench-toolchain
 	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench run --suite pyperformance --python ../$(VENV_DIR)/bin/python --cpython-cinderx "$(CINDERX_PYTHON)" --require-cinderx-baseline --ci-mode --out ../data/runs --summary-out ../$(SUMMARY_DIR) --static-summary-out ../$(STATIC_SUMMARY_DIR)
 
 bench-publish-check: python-dev
-	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench verify-publish --summary-root ../$(SUMMARY_DIR) --static-summary-root ../$(STATIC_SUMMARY_DIR)
+	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench verify-publish --summary-root ../$(SUMMARY_DIR) --static-summary-root ../$(STATIC_SUMMARY_DIR) --require-suite pyperformance
 
 bench-publish-check-smoke: python-dev
 	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench verify-publish --summary-root ../$(SUMMARY_DIR) --static-summary-root ../$(STATIC_SUMMARY_DIR) --require-suite smoke
 
 bench-dossier: python-dev
-	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench export-dossier --summary-root ../$(SUMMARY_DIR) --output-root ../$(SUMMARY_DIR)/reports
+	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench export-dossier --summary-root ../$(SUMMARY_DIR) --output-root ../$(SUMMARY_DIR)/reports --require-suite pyperformance
 
 bench-dossier-smoke: python-dev
 	cd $(PY_DIR) && ../$(VENV_DIR)/bin/cxc bench export-dossier --summary-root ../$(SUMMARY_DIR) --output-root ../$(SUMMARY_DIR)/reports --require-suite smoke

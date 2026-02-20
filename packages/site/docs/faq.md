@@ -23,7 +23,7 @@ CinderX baseline.
 ## Why does `make bench-publish-check` fail locally?
 
 Most commonly because latest summaries are not CinderX-baselined (`--cpython-cinderx` not executed,
-or runtime is not truly CinderX-capable).
+runtime is not truly CinderX-capable, or latest pyperformance summary was generated in `--ci-mode`.
 
 ## What if CinderX does not build on my machine?
 

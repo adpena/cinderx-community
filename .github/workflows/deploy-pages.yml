@@ -48,7 +48,6 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import json
-          from datetime import datetime
           from pathlib import Path
 
           root = Path("packages/site/static/data/summary")
@@ -61,125 +60,71 @@ jobs:
           if not isinstance(entries, list) or not entries:
               raise SystemExit("No summary entries found for benchmark dashboard.")
 
-          has_smoke_entry = any(
-              isinstance(entry, dict) and entry.get("suite") == "smoke"
+          has_pyperf_entry = any(
+              isinstance(entry, dict) and entry.get("suite") == "pyperformance"
               for entry in entries
           )
-          if not has_smoke_entry:
-              raise SystemExit("Missing required smoke entry in index.json.")
+          if not has_pyperf_entry:
+              raise SystemExit("Missing required pyperformance entry in index.json.")
 
-          required_suites = ("smoke", "pyperformance")
-
-          def validate_latest(suite: str) -> dict:
-              latest_path = root / f"latest-{suite}.json"
-              if not latest_path.exists():
-                  raise SystemExit(f"Missing required summary file: {latest_path}")
-              payload = json.loads(latest_path.read_text(encoding="utf-8"))
-              if payload.get("suite") != suite:
-                  raise SystemExit(
-                      f"Suite mismatch for {latest_path.name}: "
-                      f"expected '{suite}', found '{payload.get('suite')}'."
-                  )
-              baseline = payload.get("baseline_runtime")
-              run_config = ((payload.get("metadata") or {}).get("run_config") or {})
-              runtimes = payload.get("runtimes") or []
-              has_cinderx_runtime = any(
-                  isinstance(item, dict)
-                  and item.get("runtime") == "cpython-cinderx"
-                  and item.get("executed") is True
-                  for item in runtimes
-              )
-              if baseline != "cpython-cinderx":
-                  raise SystemExit(
-                      f"{latest_path.name} is not CinderX-baselined (baseline_runtime={baseline!r})."
-                  )
-              if run_config.get("require_cinderx_baseline") is not True:
-                  raise SystemExit(
-                      f"{latest_path.name} was not generated with require_cinderx_baseline=true."
-                  )
-              if not has_cinderx_runtime:
-                  raise SystemExit(
-                      f"{latest_path.name} has no executed cpython-cinderx runtime entry."
-                  )
-              allowed_runtimes = {"cpython", "cpython-cinderx", "pypy"}
-              runtime_keys = {
-                  str(item.get("runtime"))
-                  for item in runtimes
-                  if isinstance(item, dict)
-              }
-              unsupported_runtime_rows = sorted(runtime_keys - allowed_runtimes)
-              if unsupported_runtime_rows:
-                  raise SystemExit(
-                      f"{latest_path.name} includes unsupported runtime rows: {', '.join(unsupported_runtime_rows)}."
-                  )
-              benchmark_runtime_keys = {
-                  str(item.get("runtime"))
-                  for item in (payload.get("benchmarks") or [])
-                  if isinstance(item, dict)
-              }
-              unsupported_benchmark_rows = sorted(benchmark_runtime_keys - allowed_runtimes)
-              if unsupported_benchmark_rows:
-                  raise SystemExit(
-                      f"{latest_path.name} includes unsupported benchmark runtime rows: {', '.join(unsupported_benchmark_rows)}."
-                  )
-              return payload
-
-          payload_by_suite = {suite: validate_latest(suite) for suite in required_suites}
-          run_ids = {str(payload.get("run_id", "")).strip() for payload in payload_by_suite.values()}
-          if any(not value for value in run_ids):
-              details = ", ".join(
-                  f"{suite}={payload_by_suite[suite].get('run_id')!r}" for suite in required_suites
-              )
-              raise SystemExit(f"Cross-suite coherence failure: run_id missing ({details}).")
-
-          machines = {str(payload.get("machine", "")).strip() for payload in payload_by_suite.values()}
-          if len(machines) != 1:
-              details = ", ".join(
-                  f"{suite}={payload_by_suite[suite].get('machine')!r}" for suite in required_suites
-              )
-              raise SystemExit(f"Cross-suite coherence failure: machine mismatch ({details}).")
-
-          repo_shas = {
-              str(
-                  (
-                      ((payload.get("metadata") or {}).get("toolchain") or {}).get(
-                          "benchmark_repo_sha"
-                      )
-                      or ""
-                  )
-              ).strip()
-              for payload in payload_by_suite.values()
-          }
-          if len(repo_shas) != 1:
-              details = ", ".join(
-                  f"{suite}={((payload_by_suite[suite].get('metadata') or {}).get('toolchain') or {}).get('benchmark_repo_sha')!r}"
-                  for suite in required_suites
-              )
-              raise SystemExit(f"Cross-suite coherence failure: benchmark_repo_sha mismatch ({details}).")
-
-          generated_times = {}
-          for suite in required_suites:
-              raw_value = payload_by_suite[suite].get("generated_at_utc")
-              if not isinstance(raw_value, str) or not raw_value.strip():
-                  raise SystemExit(
-                      f"Cross-suite coherence failure: missing generated_at_utc for {suite}."
-                  )
-              normalized = raw_value.replace("Z", "+00:00")
-              try:
-                  generated_times[suite] = datetime.fromisoformat(normalized)
-              except ValueError as exc:
-                  raise SystemExit(
-                      f"Cross-suite coherence failure: invalid generated_at_utc for {suite}: {raw_value!r}"
-                  ) from exc
-
-          skew_seconds = (max(generated_times.values()) - min(generated_times.values())).total_seconds()
-          if skew_seconds > 3600:
-              details = ", ".join(
-                  f"{suite}={payload_by_suite[suite].get('generated_at_utc')!r}"
-                  for suite in required_suites
-              )
+          latest_path = root / "latest-pyperformance.json"
+          if not latest_path.exists():
+              raise SystemExit(f"Missing required summary file: {latest_path}")
+          payload = json.loads(latest_path.read_text(encoding="utf-8"))
+          if payload.get("suite") != "pyperformance":
               raise SystemExit(
-                  f"Cross-suite coherence failure: generated_at_utc skew {skew_seconds:.1f}s exceeds 3600s ({details})."
+                  f"Suite mismatch for {latest_path.name}: "
+                  f"expected 'pyperformance', found '{payload.get('suite')}'."
+              )
+
+          baseline = payload.get("baseline_runtime")
+          run_config = ((payload.get("metadata") or {}).get("run_config") or {})
+          runtimes = payload.get("runtimes") or []
+          has_cinderx_runtime = any(
+              isinstance(item, dict)
+              and item.get("runtime") == "cpython-cinderx"
+              and item.get("executed") is True
+              for item in runtimes
+          )
+          if baseline != "cpython-cinderx":
+              raise SystemExit(
+                  f"{latest_path.name} is not CinderX-baselined (baseline_runtime={baseline!r})."
+              )
+          if run_config.get("require_cinderx_baseline") is not True:
+              raise SystemExit(
+                  f"{latest_path.name} was not generated with require_cinderx_baseline=true."
+              )
+          if run_config.get("ci_mode") is True:
+              raise SystemExit(f"{latest_path.name} is CI-mode and not publishable headline data.")
+          pyperf_mode = run_config.get("pyperformance_mode")
+          if pyperf_mode not in (None, "default"):
+              raise SystemExit(
+                  f"{latest_path.name} uses non-full pyperformance mode ({pyperf_mode!r})."
+              )
+          if not has_cinderx_runtime:
+              raise SystemExit(
+                  f"{latest_path.name} has no executed cpython-cinderx runtime entry."
+              )
+          allowed_runtimes = {"cpython", "cpython-cinderx", "pypy"}
+          runtime_keys = {
+              str(item.get("runtime"))
+              for item in runtimes
+              if isinstance(item, dict)
+          }
+          unsupported_runtime_rows = sorted(runtime_keys - allowed_runtimes)
+          if unsupported_runtime_rows:
+              raise SystemExit(
+                  f"{latest_path.name} includes unsupported runtime rows: {', '.join(unsupported_runtime_rows)}."
+              )
+          benchmark_runtime_keys = {
+              str(item.get("runtime"))
+              for item in (payload.get("benchmarks") or [])
+              if isinstance(item, dict)
+          }
+          unsupported_benchmark_rows = sorted(benchmark_runtime_keys - allowed_runtimes)
+          if unsupported_benchmark_rows:
+              raise SystemExit(
+                  f"{latest_path.name} includes unsupported benchmark runtime rows: {', '.join(unsupported_benchmark_rows)}."
               )
           PY
 

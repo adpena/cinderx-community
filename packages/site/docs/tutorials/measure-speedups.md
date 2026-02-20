@@ -74,7 +74,6 @@ If guard fails, treat results as non-publishable diagnostics, not headline compa
 Inspect latest summaries:
 
 ```bash
-jq '{suite,run_id,machine,baseline_runtime,runtimes:(.runtimes|map({runtime,executed})),skipped_runtimes}' data/summary/latest-smoke.json
 jq '{suite,run_id,machine,baseline_runtime,runtimes:(.runtimes|map({runtime,executed})),skipped_runtimes}' data/summary/latest-pyperformance.json
 ```
 
@@ -82,7 +81,7 @@ For published claims in this repo, only use runs that are:
 
 - `baseline_runtime = "cpython-cinderx"`
 - `metadata.run_config.require_cinderx_baseline = true`
-- smoke + pyperformance summary pair is coherent (same run/machine/toolchain metadata)
+- `metadata.run_config.ci_mode = false` (full pyperformance)
 - accepted by `make bench-publish-check`
 
 ## Troubleshooting
