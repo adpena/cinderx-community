@@ -1,6 +1,15 @@
 {
-  "updated_at_utc": "2026-02-20T04:08:53Z",
+  "updated_at_utc": "2026-02-20T04:16:15Z",
   "entries": [
+    {
+      "recorded_at_utc": "2026-02-20T04:16:15Z",
+      "run_id": "22211033886",
+      "sha": "1000b37764bf723020fc53b62d61dea9cbac1842",
+      "ref": "main",
+      "run_summary_dir": "history/runs/20260220T041615Z-run22211033886/summary",
+      "latest_smoke_path": "history/latest/latest-smoke.json",
+      "latest_pyperformance_path": "history/latest/latest-pyperformance.json"
+    },
     {
       "recorded_at_utc": "2026-02-20T04:08:53Z",
       "run_id": "manual-1771560534",
