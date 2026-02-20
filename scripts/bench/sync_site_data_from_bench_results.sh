@@ -48,21 +48,14 @@ entries = index.get("entries", [])
 if not isinstance(entries, list) or not entries:
     raise SystemExit("No benchmark entries found after sync.")
 
-required_suites = ("smoke", "pyperformance")
-entry_by_suite: dict[str, str] = {}
-for entry in entries:
-    if not isinstance(entry, dict):
-        continue
-    suite = entry.get("suite")
-    file_name = entry.get("file")
-    if isinstance(suite, str) and isinstance(file_name, str) and suite not in entry_by_suite:
-        entry_by_suite[suite] = file_name
+has_smoke_entry = any(
+    isinstance(entry, dict) and entry.get("suite") == "smoke"
+    for entry in entries
+)
+if not has_smoke_entry:
+    raise SystemExit("Missing required smoke entry in synced index.json.")
 
-missing_entries = [suite for suite in required_suites if suite not in entry_by_suite]
-if missing_entries:
-    raise SystemExit(
-        "Missing required suite entries in synced index.json: " + ", ".join(missing_entries)
-    )
+required_suites = ("smoke", "pyperformance")
 
 
 def validate_latest(suite: str) -> dict:
@@ -177,7 +170,7 @@ if skew_seconds > 3600:
     )
 
 print(f"synced_entries={len(entries)}")
-print("required_suites=smoke,pyperformance")
+print("required_latest_files=smoke,pyperformance")
 print("publishable_cinderx_required=true")
 PY
 
