@@ -704,6 +704,8 @@ def test_run_pyperformance_suite_records_bootstrap_profile_metadata(
     assert observed_env_by_runtime_key["cpython-cinderx"]["CXC_PYPERF_BOOTSTRAP_MODE"] == (
         "sitecustomize-profile"
     )
+    assert observed_env_by_runtime_key["cpython"]["SETUPTOOLS_USE_DISTUTILS"] == "local"
+    assert observed_env_by_runtime_key["cpython-cinderx"]["SETUPTOOLS_USE_DISTUTILS"] == "local"
     assert observed_env_by_runtime_key["cpython"]["CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY"] == (
         "cpython-cinderx"
     )
@@ -795,11 +797,19 @@ def test_preflight_pyperformance_uses_cinderx_runtime_with_auto_profile(
     assert any("--help" in command for command in observed_commands)
     assert any("run" in command for command in observed_commands)
     assert any("--debug-single-value" in command for command in observed_commands)
+    assert any(
+        "--benchmarks" in command
+        and command[command.index("--benchmarks") + 1]
+        == runner.PYPERFORMANCE_LEGACY_DISTUTILS_BENCHMARKS
+        for command in observed_commands
+    )
     assert all("--inherit-environ" in command for command in observed_commands)
     assert observed_env_by_command
-    assert all(
+    assert any(
         env.get("CXC_PYPERF_RUNTIME_KEY") == "cpython-cinderx" for env in observed_env_by_command
     )
+    assert any(env.get("CXC_PYPERF_RUNTIME_KEY") == "cpython" for env in observed_env_by_command)
+    assert all(env.get("SETUPTOOLS_USE_DISTUTILS") == "local" for env in observed_env_by_command)
     assert all(
         env.get("CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY") == "cpython-cinderx"
         for env in observed_env_by_command

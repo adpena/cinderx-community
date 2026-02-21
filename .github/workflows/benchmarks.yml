@@ -168,6 +168,7 @@ jobs:
       - name: Preflight pyperformance bootstrap matrix (fast fail)
         env:
           PYTHONSTRICTMODULESTUBSPATH: ${{ steps.cinderx_strict.outputs.strict_stubs_path }}
+          SETUPTOOLS_USE_DISTUTILS: local
         run: |
           set -euo pipefail
           for profile in cinderx-jit-all cinderx-jit-compile-after-n-calls; do
@@ -198,6 +199,7 @@ jobs:
       - name: Run pyperformance suite (publishable full)
         env:
           PYTHONSTRICTMODULESTUBSPATH: ${{ steps.cinderx_strict.outputs.strict_stubs_path }}
+          SETUPTOOLS_USE_DISTUTILS: local
         run: |
           .venv/bin/cxc bench run \
             --suite pyperformance \

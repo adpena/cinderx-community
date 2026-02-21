@@ -44,6 +44,8 @@ PYPERFORMANCE_BOOTSTRAP_PROFILES = [
 ]
 DEFAULT_PYPERFORMANCE_JIT_COMPILE_AFTER_N_CALLS = 40000
 AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE = "cinderx-jit-all"
+SETUPTOOLS_DISTUTILS_LOCAL_MODE = "local"
+PYPERFORMANCE_LEGACY_DISTUTILS_BENCHMARKS = "django_template,sympy"
 PYPERFORMANCE_INHERITED_ENV_VARS = (
     "PYTHONPATH",
     "PYTHONSTRICTMODULESTUBSPATH",
@@ -55,6 +57,7 @@ PYPERFORMANCE_INHERITED_ENV_VARS = (
     "CXC_PYPERF_STATIC_LOADER_STATUS",
     "CXC_PYPERF_EXPECTED_EXECUTABLE",
     "CXC_PYPERF_CINDERX_IMPORT_PARENT",
+    "SETUPTOOLS_USE_DISTUTILS",
 )
 
 WORKLOAD_TAXONOMY = [
@@ -1035,6 +1038,12 @@ def _with_pyperformance_inherit_environ(
     return [*command, "--inherit-environ", inherit_value]
 
 
+def _ensure_setuptools_distutils_local_mode(env: dict[str, str]) -> None:
+    configured = (env.get("SETUPTOOLS_USE_DISTUTILS") or "").strip().lower()
+    if configured != SETUPTOOLS_DISTUTILS_LOCAL_MODE:
+        env["SETUPTOOLS_USE_DISTUTILS"] = SETUPTOOLS_DISTUTILS_LOCAL_MODE
+
+
 def _normalize_executable_path(raw: Any) -> str | None:
     if not isinstance(raw, str):
         return None
@@ -1518,6 +1527,24 @@ def _prepare_pyperformance_bootstrap(
         audit_dir = os.environ.get("CXC_PYPERF_JIT_AUDIT_DIR", "").strip()
         should_apply = not bootstrap_target_runtime or runtime_key == bootstrap_target_runtime
 
+        def _ensure_distutils_compat() -> None:
+            try:
+                import distutils.version  # noqa: F401
+                return
+            except Exception:
+                pass
+
+            os.environ.setdefault("SETUPTOOLS_USE_DISTUTILS", "local")
+            try:
+                import setuptools  # noqa: F401
+                import distutils.version  # noqa: F401
+            except Exception as exc:
+                raise RuntimeError(
+                    "distutils compatibility is required for legacy pyperformance benchmarks "
+                    "on Python 3.14+. Ensure setuptools is installed and "
+                    "SETUPTOOLS_USE_DISTUTILS=local."
+                ) from exc
+
         def _write_jit_audit_record() -> None:
             if not should_apply or not audit_dir:
                 return
@@ -1600,6 +1627,8 @@ def _prepare_pyperformance_bootstrap(
         if should_apply and audit_dir:
             atexit.register(_write_jit_audit_record)
 
+        _ensure_distutils_compat()
+
         if bootstrap:
             if should_apply:
                 namespace = {}
@@ -1616,6 +1645,7 @@ def _prepare_pyperformance_bootstrap(
     (shim_root / "sitecustomize.py").write_text(sitecustomize, encoding="utf-8")
 
     env = dict(os.environ)
+    _ensure_setuptools_distutils_local_mode(env)
     current_pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = (
         f"{shim_root}{os.pathsep}{current_pythonpath}" if current_pythonpath else str(shim_root)
@@ -3140,6 +3170,7 @@ def run_pyperformance_suite(
         runtime_bootstrap_env: dict[str, str] | None = None
         if pyperformance_bootstrap_env:
             runtime_bootstrap_env = dict(pyperformance_bootstrap_env)
+            _ensure_setuptools_distutils_local_mode(runtime_bootstrap_env)
             runtime_bootstrap_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
             runtime_bootstrap_env["CXC_PYPERF_EXPECTED_EXECUTABLE"] = str(target.executable)
             if target.key == "cpython-cinderx":
@@ -3167,6 +3198,7 @@ def run_pyperformance_suite(
             jit_audit_tempdir = tempfile.TemporaryDirectory(prefix="cxc-pyperf-jit-audit-")
             if runtime_bootstrap_env is None:
                 runtime_bootstrap_env = dict(os.environ)
+                _ensure_setuptools_distutils_local_mode(runtime_bootstrap_env)
             runtime_bootstrap_env["CXC_PYPERF_JIT_AUDIT_DIR"] = jit_audit_tempdir.name
 
         command = _with_pyperformance_inherit_environ(command, env=runtime_bootstrap_env)
@@ -3550,6 +3582,14 @@ def preflight_pyperformance_suite(
         )
     if target is None or target.executable is None:
         raise ValueError("No usable Python runtime found for pyperformance preflight.")
+    baseline_target = next(
+        (
+            item
+            for item in targets
+            if item.key == "cpython" and item.available and item.executable is not None
+        ),
+        None,
+    )
 
     commands: list[list[str]] = [
         [str(target.executable), "-m", "pyperformance", "--help"],
@@ -3570,6 +3610,23 @@ def preflight_pyperformance_suite(
             str(quick_run_output),
         ]
     )
+    baseline_compat_tempdir = tempfile.TemporaryDirectory(
+        prefix="cxc-pyperf-preflight-baseline-compat-"
+    )
+    baseline_compat_output = Path(baseline_compat_tempdir.name) / "preflight-baseline-compat.json"
+    baseline_compat_command: list[str] | None = None
+    if baseline_target is not None and baseline_target.executable is not None:
+        baseline_compat_command = [
+            str(baseline_target.executable),
+            "-m",
+            "pyperformance",
+            "run",
+            "--debug-single-value",
+            "--benchmarks",
+            PYPERFORMANCE_LEGACY_DISTUTILS_BENCHMARKS,
+            "--output",
+            str(baseline_compat_output),
+        ]
     command_text: list[str] = []
     jit_probe_payload: dict[str, Any] | None = None
     jit_audit_summary: dict[str, Any] | None = None
@@ -3583,6 +3640,7 @@ def preflight_pyperformance_suite(
         preflight_env: dict[str, str] | None = None
         if resolved_bootstrap.env:
             preflight_env = dict(resolved_bootstrap.env)
+            _ensure_setuptools_distutils_local_mode(preflight_env)
             preflight_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
             preflight_env["CXC_PYPERF_EXPECTED_EXECUTABLE"] = str(target.executable)
             if target.key == "cpython-cinderx":
@@ -3600,6 +3658,7 @@ def preflight_pyperformance_suite(
             )
             if preflight_env is None:
                 preflight_env = dict(os.environ)
+                _ensure_setuptools_distutils_local_mode(preflight_env)
             preflight_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
             preflight_env["CXC_PYPERF_EXPECTED_EXECUTABLE"] = str(target.executable)
             preflight_env["CXC_PYPERF_JIT_AUDIT_DIR"] = preflight_jit_audit_tempdir.name
@@ -3608,6 +3667,23 @@ def preflight_pyperformance_suite(
             command_with_inherit = _with_pyperformance_inherit_environ(command, env=preflight_env)
             _run_command(command_with_inherit, timeout_s=timeout_seconds, env=preflight_env)
             command_text.append(" ".join(command_with_inherit))
+        if baseline_compat_command is not None and baseline_target is not None:
+            baseline_preflight_env = dict(resolved_bootstrap.env or os.environ)
+            _ensure_setuptools_distutils_local_mode(baseline_preflight_env)
+            baseline_preflight_env["CXC_PYPERF_RUNTIME_KEY"] = baseline_target.key
+            baseline_preflight_env["CXC_PYPERF_EXPECTED_EXECUTABLE"] = str(
+                baseline_target.executable
+            )
+            baseline_command_with_inherit = _with_pyperformance_inherit_environ(
+                baseline_compat_command,
+                env=baseline_preflight_env,
+            )
+            _run_command(
+                baseline_command_with_inherit,
+                timeout_s=max(timeout_seconds, 180),
+                env=baseline_preflight_env,
+            )
+            command_text.append(" ".join(baseline_command_with_inherit))
 
         if expect_jit_audit and preflight_jit_audit_tempdir is not None:
             jit_audit_summary = _collect_pyperformance_jit_audit(
@@ -3686,6 +3762,7 @@ def preflight_pyperformance_suite(
         ) from exc
     finally:
         quick_run_tempdir.cleanup()
+        baseline_compat_tempdir.cleanup()
         if preflight_jit_audit_tempdir is not None:
             preflight_jit_audit_tempdir.cleanup()
         if resolved_bootstrap.tempdir is not None:
@@ -3717,6 +3794,11 @@ def preflight_pyperformance_suite(
         notes.append(
             "CinderX import parent was prepended to PYTHONPATH for pyperformance workers: "
             f"{preflight_cinderx_import_parent}"
+        )
+    if baseline_compat_command is not None:
+        notes.append(
+            "Baseline compatibility quick-run validated legacy distutils-backed benchmarks: "
+            f"{PYPERFORMANCE_LEGACY_DISTUTILS_BENCHMARKS}."
         )
 
     return PyperformancePreflightResult(
