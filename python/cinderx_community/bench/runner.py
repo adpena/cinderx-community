@@ -797,11 +797,6 @@ def _validate_publishable_summary_payload(
                         f"{source}: runtime row 'cpython-cinderx' jit_audit "
                         "must report compiled_during_run=true."
                     )
-                if int(jit_audit.get("cinderx_module_not_found_count") or 0) > 0:
-                    failures.append(
-                        f"{source}: runtime row 'cpython-cinderx' jit_audit "
-                        "reported cinderx import failures."
-                    )
                 expected_executable = jit_audit.get("expected_executable")
                 if expected_executable:
                     if int(jit_audit.get("matching_expected_executable_record_count") or 0) <= 0:
@@ -841,6 +836,13 @@ def _validate_publishable_summary_payload(
                             f"{source}: runtime row 'cpython-cinderx' jit_audit "
                             "must report compiled_during_run=true on expected executable."
                         )
+                elif int(jit_audit.get("cinderx_module_not_found_count") or 0) > 0:
+                    # Backward-compatible fallback for summaries emitted before expected-executable
+                    # scoped JIT audit fields were added.
+                    failures.append(
+                        f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                        "reported cinderx import failures."
+                    )
                 if pyperf_static_loader_required:
                     statuses = jit_audit.get("static_loader_statuses")
                     status_list = statuses if isinstance(statuses, list) else []

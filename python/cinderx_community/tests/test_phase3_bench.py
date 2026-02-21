@@ -1068,6 +1068,95 @@ def test_verify_publishable_summaries_rejects_missing_pyperformance_jit_audit(
         )
 
 
+def test_verify_publishable_summaries_allows_non_target_subprocess_import_failures(
+    tmp_path: Path,
+) -> None:
+    summary_root = tmp_path / "summary"
+    summary_root.mkdir(parents=True, exist_ok=True)
+
+    pyperf_payload = _publishable_summary_payload(suite=PYPERFORMANCE_SUITE)
+    runtimes = pyperf_payload.get("runtimes")
+    assert isinstance(runtimes, list) and runtimes
+    runtime_row = runtimes[0]
+    assert isinstance(runtime_row, dict)
+    jit_audit = runtime_row.get("jit_audit")
+    assert isinstance(jit_audit, dict)
+    jit_audit.update(
+        {
+            "expected_executable": "/tmp/cinderx-python",
+            "matching_expected_executable_record_count": 3,
+            "matching_expected_executable_module_not_found_count": 0,
+            "matching_expected_executable_jit_module_available_any": True,
+            "matching_expected_executable_jit_enabled_any": True,
+            "matching_expected_executable_compiled_during_run": True,
+            "cinderx_module_not_found_count": 9,
+        }
+    )
+
+    (summary_root / "latest-pyperformance.json").write_text(
+        json.dumps(pyperf_payload),
+        encoding="utf-8",
+    )
+    _write_index(
+        summary_root / "index.json",
+        suites=[PYPERFORMANCE_SUITE],
+        latest_file_by_suite={PYPERFORMANCE_SUITE: "latest-pyperformance.json"},
+    )
+
+    runner.verify_publishable_summaries(
+        summary_root=summary_root,
+        suites=[PYPERFORMANCE_SUITE],
+    )
+
+
+def test_verify_publishable_summaries_rejects_target_executable_import_failures(
+    tmp_path: Path,
+) -> None:
+    summary_root = tmp_path / "summary"
+    summary_root.mkdir(parents=True, exist_ok=True)
+
+    pyperf_payload = _publishable_summary_payload(suite=PYPERFORMANCE_SUITE)
+    runtimes = pyperf_payload.get("runtimes")
+    assert isinstance(runtimes, list) and runtimes
+    runtime_row = runtimes[0]
+    assert isinstance(runtime_row, dict)
+    jit_audit = runtime_row.get("jit_audit")
+    assert isinstance(jit_audit, dict)
+    jit_audit.update(
+        {
+            "expected_executable": "/tmp/cinderx-python",
+            "matching_expected_executable_record_count": 3,
+            "matching_expected_executable_module_not_found_count": 1,
+            "matching_expected_executable_jit_module_available_any": True,
+            "matching_expected_executable_jit_enabled_any": True,
+            "matching_expected_executable_compiled_during_run": True,
+            "cinderx_module_not_found_count": 1,
+        }
+    )
+
+    (summary_root / "latest-pyperformance.json").write_text(
+        json.dumps(pyperf_payload),
+        encoding="utf-8",
+    )
+    _write_index(
+        summary_root / "index.json",
+        suites=[PYPERFORMANCE_SUITE],
+        latest_file_by_suite={PYPERFORMANCE_SUITE: "latest-pyperformance.json"},
+    )
+
+    try:
+        runner.verify_publishable_summaries(
+            summary_root=summary_root,
+            suites=[PYPERFORMANCE_SUITE],
+        )
+    except ValueError as exc:
+        assert "on expected executable" in str(exc)
+    else:
+        raise AssertionError(
+            "Expected publish verification failure for target-executable import failures"
+        )
+
+
 def test_verify_publishable_summaries_rejects_static_mismatch(tmp_path: Path) -> None:
     summary_root = tmp_path / "summary"
     static_root = tmp_path / "static-summary"
