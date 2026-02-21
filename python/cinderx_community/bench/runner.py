@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -53,6 +54,7 @@ PYPERFORMANCE_INHERITED_ENV_VARS = (
     "CXC_PYPERF_JIT_AUDIT_DIR",
     "CXC_PYPERF_STATIC_LOADER_STATUS",
     "CXC_PYPERF_EXPECTED_EXECUTABLE",
+    "CXC_PYPERF_CINDERX_IMPORT_PARENT",
 )
 
 WORKLOAD_TAXONOMY = [
@@ -1039,7 +1041,63 @@ def _normalize_executable_path(raw: Any) -> str | None:
     normalized = raw.strip()
     if not normalized:
         return None
-    return os.path.abspath(normalized)
+    return os.path.realpath(os.path.abspath(normalized))
+
+
+def _prepend_pythonpath(env: dict[str, str], path: str) -> None:
+    candidate = path.strip()
+    if not candidate:
+        return
+
+    existing = env.get("PYTHONPATH", "")
+    existing_parts = [part for part in existing.split(os.pathsep) if part]
+    normalized_existing = {
+        _normalize_executable_path(part) or os.path.abspath(part) for part in existing_parts
+    }
+    normalized_candidate = _normalize_executable_path(candidate) or os.path.abspath(candidate)
+    if normalized_candidate in normalized_existing:
+        return
+
+    env["PYTHONPATH"] = f"{candidate}{os.pathsep}{existing}" if existing else candidate
+
+
+def _discover_cinderx_import_parent(
+    executable: Path, *, env: dict[str, str] | None = None
+) -> str | None:
+    script = textwrap.dedent(
+        """
+        import importlib.util
+        import json
+        import pathlib
+
+        payload = {"import_parent": None}
+        spec = importlib.util.find_spec("cinderx")
+        if spec is not None and spec.origin:
+            origin = pathlib.Path(spec.origin).resolve()
+            payload["import_parent"] = str(origin.parent.parent)
+        print(json.dumps(payload))
+        """
+    ).strip()
+
+    try:
+        completed = _run_command([str(executable), "-c", script], timeout_s=30, env=env)
+    except ValueError:
+        return None
+
+    for line in reversed(completed.stdout.splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        import_parent = payload.get("import_parent")
+        if isinstance(import_parent, str) and import_parent.strip():
+            return import_parent.strip()
+    return None
 
 
 def _version_line(executable: Path) -> str:
@@ -1476,6 +1534,7 @@ def _prepare_pyperformance_bootstrap(
                 "compiled_function_count": None,
                 "runtime_stats_keys": [],
                 "static_loader_status": os.environ.get("CXC_PYPERF_STATIC_LOADER_STATUS"),
+                "cinderx_import_parent": os.environ.get("CXC_PYPERF_CINDERX_IMPORT_PARENT"),
                 "cinderx_spec_origin": None,
                 "error": None,
             }
@@ -1705,6 +1764,17 @@ def _collect_pyperformance_jit_audit(audit_dir: Path) -> dict[str, Any]:
         if expected_executable is not None
         else []
     )
+    executable_counts = Counter(
+        normalized
+        for normalized in (
+            _normalize_executable_path(record.get("sys_executable")) for record in records
+        )
+        if normalized
+    )
+    top_executables = [
+        {"executable": executable, "count": count}
+        for executable, count in executable_counts.most_common(5)
+    ]
 
     compiled_counts = [
         int(value)
@@ -1757,8 +1827,12 @@ def _collect_pyperformance_jit_audit(audit_dir: Path) -> dict[str, Any]:
         "record_count": len(records),
         "parse_failure_count": len(parse_failures),
         "parse_failures": parse_failures[:5],
+        "top_executables": top_executables,
         "expected_executable": expected_executable,
         "matching_expected_executable_record_count": len(matching_expected_records),
+        "matching_expected_executable_record_ratio": (
+            (len(matching_expected_records) / len(records)) if records else 0.0
+        ),
         "jit_module_available_any": jit_module_available_any,
         "jit_enabled_any": jit_enabled_any,
         "matching_expected_executable_jit_module_available_any": matching_jit_module_available_any,
@@ -2990,6 +3064,8 @@ def run_pyperformance_suite(
             "pyperformance_cinderx_static_loader_fail_fast": _profile_expects_static_loader(
                 resolved_bootstrap_profile
             ),
+            "pyperformance_cinderx_import_parent": None,
+            "pyperformance_cinderx_import_parent_inherited": False,
         },
         "toolchain": {
             "benchmark_repo_sha": repo_sha,
@@ -3066,6 +3142,20 @@ def run_pyperformance_suite(
             runtime_bootstrap_env = dict(pyperformance_bootstrap_env)
             runtime_bootstrap_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
             runtime_bootstrap_env["CXC_PYPERF_EXPECTED_EXECUTABLE"] = str(target.executable)
+            if target.key == "cpython-cinderx":
+                cinderx_import_parent = _discover_cinderx_import_parent(
+                    target.executable,
+                    env=runtime_bootstrap_env,
+                )
+                if cinderx_import_parent:
+                    _prepend_pythonpath(runtime_bootstrap_env, cinderx_import_parent)
+                    runtime_bootstrap_env["CXC_PYPERF_CINDERX_IMPORT_PARENT"] = (
+                        cinderx_import_parent
+                    )
+                    run_config = metadata.get("run_config")
+                    if isinstance(run_config, dict):
+                        run_config["pyperformance_cinderx_import_parent"] = cinderx_import_parent
+                        run_config["pyperformance_cinderx_import_parent_inherited"] = True
 
         expect_post_run_jit_audit = (
             target.key == "cpython-cinderx"
@@ -3483,6 +3573,7 @@ def preflight_pyperformance_suite(
     command_text: list[str] = []
     jit_probe_payload: dict[str, Any] | None = None
     jit_audit_summary: dict[str, Any] | None = None
+    preflight_cinderx_import_parent: str | None = None
     preflight_jit_audit_tempdir: tempfile.TemporaryDirectory[str] | None = None
     expect_jit_audit = target.key == "cpython-cinderx" and _profile_expects_jit_compilation(
         resolved_bootstrap.profile
@@ -3494,6 +3585,15 @@ def preflight_pyperformance_suite(
             preflight_env = dict(resolved_bootstrap.env)
             preflight_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
             preflight_env["CXC_PYPERF_EXPECTED_EXECUTABLE"] = str(target.executable)
+            if target.key == "cpython-cinderx":
+                cinderx_import_parent = _discover_cinderx_import_parent(
+                    target.executable,
+                    env=preflight_env,
+                )
+                if cinderx_import_parent:
+                    _prepend_pythonpath(preflight_env, cinderx_import_parent)
+                    preflight_env["CXC_PYPERF_CINDERX_IMPORT_PARENT"] = cinderx_import_parent
+                    preflight_cinderx_import_parent = cinderx_import_parent
         if expect_jit_audit:
             preflight_jit_audit_tempdir = tempfile.TemporaryDirectory(
                 prefix="cxc-pyperf-preflight-jit-audit-"
@@ -3612,6 +3712,11 @@ def preflight_pyperformance_suite(
     if jit_audit_summary is not None:
         notes.append(
             f"Quick-run JIT audit summary: {json.dumps(jit_audit_summary, sort_keys=True)}"
+        )
+    if preflight_cinderx_import_parent:
+        notes.append(
+            "CinderX import parent was prepended to PYTHONPATH for pyperformance workers: "
+            f"{preflight_cinderx_import_parent}"
         )
 
     return PyperformancePreflightResult(

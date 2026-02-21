@@ -528,12 +528,65 @@ def test_collect_pyperformance_jit_audit(tmp_path: Path) -> None:
     assert payload["record_count"] == 2
     assert payload["expected_executable"] is None
     assert payload["matching_expected_executable_record_count"] == 0
+    assert payload["matching_expected_executable_record_ratio"] == 0.0
     assert payload["jit_module_available_any"] is True
     assert payload["jit_enabled_any"] is True
     assert payload["compiled_function_count_max"] == 4
     assert payload["compiled_during_run"] is True
     assert payload["cinderx_module_not_found_count"] == 0
+    assert payload["top_executables"] == []
     assert payload["static_loader_statuses"] == ["installed"]
+
+
+def test_collect_pyperformance_jit_audit_normalizes_realpath_for_expected_executable(
+    tmp_path: Path,
+) -> None:
+    audit_dir = tmp_path / "jit-audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    real_python = bin_dir / "python-real"
+    real_python.write_text("#!/bin/sh\n", encoding="utf-8")
+    expected_link = bin_dir / "python-link"
+    expected_link.symlink_to(real_python)
+
+    (audit_dir / "jit-audit-1.json").write_text(
+        json.dumps(
+            {
+                "expected_executable": str(expected_link),
+                "sys_executable": str(real_python),
+                "jit_module_available": True,
+                "jit_enabled": True,
+                "compiled_function_count": 3,
+                "static_loader_status": "installed",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (audit_dir / "jit-audit-2.json").write_text(
+        json.dumps(
+            {
+                "expected_executable": str(expected_link),
+                "sys_executable": str(real_python),
+                "jit_module_available": False,
+                "jit_enabled": False,
+                "compiled_function_count": 0,
+                "static_loader_status": "installed",
+                "error": "cinderx module not found",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = runner._collect_pyperformance_jit_audit(audit_dir)
+    assert payload["record_count"] == 2
+    assert payload["expected_executable"] == str(real_python.resolve())
+    assert payload["matching_expected_executable_record_count"] == 2
+    assert payload["matching_expected_executable_record_ratio"] == 1.0
+    assert payload["matching_expected_executable_module_not_found_count"] == 1
+    assert payload["cinderx_module_not_found_count"] == 1
+    assert payload["top_executables"] == [{"executable": str(real_python.resolve()), "count": 2}]
 
 
 def test_resolve_pyperformance_bootstrap_rejects_profile_inline_conflict() -> None:
