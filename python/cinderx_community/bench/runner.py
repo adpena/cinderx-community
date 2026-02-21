@@ -43,6 +43,17 @@ PYPERFORMANCE_BOOTSTRAP_PROFILES = [
 ]
 DEFAULT_PYPERFORMANCE_JIT_COMPILE_AFTER_N_CALLS = 40000
 AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE = "cinderx-jit-all"
+PYPERFORMANCE_INHERITED_ENV_VARS = (
+    "PYTHONPATH",
+    "PYTHONSTRICTMODULESTUBSPATH",
+    "CXC_PYPERF_BOOTSTRAP_INLINE",
+    "CXC_PYPERF_BOOTSTRAP_MODE",
+    "CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY",
+    "CXC_PYPERF_RUNTIME_KEY",
+    "CXC_PYPERF_JIT_AUDIT_DIR",
+    "CXC_PYPERF_STATIC_LOADER_STATUS",
+    "CXC_PYPERF_EXPECTED_EXECUTABLE",
+)
 
 WORKLOAD_TAXONOMY = [
     {
@@ -786,6 +797,50 @@ def _validate_publishable_summary_payload(
                         f"{source}: runtime row 'cpython-cinderx' jit_audit "
                         "must report compiled_during_run=true."
                     )
+                if int(jit_audit.get("cinderx_module_not_found_count") or 0) > 0:
+                    failures.append(
+                        f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                        "reported cinderx import failures."
+                    )
+                expected_executable = jit_audit.get("expected_executable")
+                if expected_executable:
+                    if int(jit_audit.get("matching_expected_executable_record_count") or 0) <= 0:
+                        failures.append(
+                            f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                            "must include records for the expected executable."
+                        )
+                    if (
+                        int(
+                            jit_audit.get("matching_expected_executable_module_not_found_count")
+                            or 0
+                        )
+                        > 0
+                    ):
+                        failures.append(
+                            f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                            "reported cinderx import failures on expected executable."
+                        )
+                    if (
+                        jit_audit.get("matching_expected_executable_jit_module_available_any")
+                        is not True
+                    ):
+                        failures.append(
+                            f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                            "must report cinderx.jit availability on expected executable."
+                        )
+                    if jit_audit.get("matching_expected_executable_jit_enabled_any") is not True:
+                        failures.append(
+                            f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                            "must report jit_enabled_any=true on expected executable."
+                        )
+                    if pyperf_jit_audit_required and (
+                        jit_audit.get("matching_expected_executable_compiled_during_run")
+                        is not True
+                    ):
+                        failures.append(
+                            f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                            "must report compiled_during_run=true on expected executable."
+                        )
                 if pyperf_static_loader_required:
                     statuses = jit_audit.get("static_loader_statuses")
                     status_list = statuses if isinstance(statuses, list) else []
@@ -956,6 +1011,33 @@ def _run_command(
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr.strip() or "(no stderr)"
         raise ValueError(f"Command failed: {' '.join(args)}\n{stderr}") from exc
+
+
+def _pyperformance_inherit_environ_value(env: dict[str, str] | None) -> str | None:
+    if not env:
+        return None
+    names = [name for name in PYPERFORMANCE_INHERITED_ENV_VARS if env.get(name)]
+    if not names:
+        return None
+    return ",".join(names)
+
+
+def _with_pyperformance_inherit_environ(
+    command: list[str], *, env: dict[str, str] | None
+) -> list[str]:
+    inherit_value = _pyperformance_inherit_environ_value(env)
+    if not inherit_value:
+        return command
+    return [*command, "--inherit-environ", inherit_value]
+
+
+def _normalize_executable_path(raw: Any) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    normalized = raw.strip()
+    if not normalized:
+        return None
+    return os.path.abspath(normalized)
 
 
 def _version_line(executable: Path) -> str:
@@ -1380,6 +1462,10 @@ def _prepare_pyperformance_bootstrap(
             if not should_apply or not audit_dir:
                 return
             payload = {
+                "pid": os.getpid(),
+                "sys_executable": sys.executable,
+                "argv0": (sys.argv[0] if sys.argv else None),
+                "expected_executable": os.environ.get("CXC_PYPERF_EXPECTED_EXECUTABLE"),
                 "runtime_key": runtime_key,
                 "bootstrap_target_runtime_key": bootstrap_target_runtime,
                 "jit_module_available": False,
@@ -1388,10 +1474,13 @@ def _prepare_pyperformance_bootstrap(
                 "compiled_function_count": None,
                 "runtime_stats_keys": [],
                 "static_loader_status": os.environ.get("CXC_PYPERF_STATIC_LOADER_STATUS"),
+                "cinderx_spec_origin": None,
                 "error": None,
             }
             try:
-                if importlib.util.find_spec("cinderx") is not None:
+                cinderx_spec = importlib.util.find_spec("cinderx")
+                if cinderx_spec is not None:
+                    payload["cinderx_spec_origin"] = getattr(cinderx_spec, "origin", None)
                     import cinderx
 
                     if hasattr(cinderx, "init"):
@@ -1594,14 +1683,49 @@ def _collect_pyperformance_jit_audit(audit_dir: Path) -> dict[str, Any]:
         if isinstance(payload, dict):
             records.append(payload)
 
+    expected_executable = next(
+        (
+            normalized
+            for normalized in (
+                _normalize_executable_path(record.get("expected_executable")) for record in records
+            )
+            if normalized
+        ),
+        None,
+    )
+    matching_expected_records = (
+        [
+            record
+            for record in records
+            if expected_executable is not None
+            and _normalize_executable_path(record.get("sys_executable")) == expected_executable
+        ]
+        if expected_executable is not None
+        else []
+    )
+
     compiled_counts = [
         int(value)
         for value in (record.get("compiled_function_count") for record in records)
         if isinstance(value, int)
     ]
     compiled_function_count_max = max(compiled_counts) if compiled_counts else None
+    matching_compiled_counts = [
+        int(value)
+        for value in (record.get("compiled_function_count") for record in matching_expected_records)
+        if isinstance(value, int)
+    ]
+    matching_compiled_function_count_max = (
+        max(matching_compiled_counts) if matching_compiled_counts else None
+    )
     jit_module_available_any = any(bool(record.get("jit_module_available")) for record in records)
     jit_enabled_any = any(record.get("jit_enabled") is True for record in records)
+    matching_jit_module_available_any = any(
+        bool(record.get("jit_module_available")) for record in matching_expected_records
+    )
+    matching_jit_enabled_any = any(
+        record.get("jit_enabled") is True for record in matching_expected_records
+    )
     static_loader_statuses = sorted(
         {
             str(value)
@@ -1614,20 +1738,47 @@ def _collect_pyperformance_jit_audit(audit_dir: Path) -> dict[str, Any]:
         for value in (record.get("error") for record in records)
         if isinstance(value, str) and value.strip()
     ]
+    matching_errors = [
+        str(value)
+        for value in (record.get("error") for record in matching_expected_records)
+        if isinstance(value, str) and value.strip()
+    ]
+    cinderx_module_not_found_error = "cinderx module not found"
+    cinderx_module_not_found_count = sum(
+        1 for value in errors if value == cinderx_module_not_found_error
+    )
+    matching_module_not_found_count = sum(
+        1 for value in matching_errors if value == cinderx_module_not_found_error
+    )
 
     return {
         "record_count": len(records),
         "parse_failure_count": len(parse_failures),
         "parse_failures": parse_failures[:5],
+        "expected_executable": expected_executable,
+        "matching_expected_executable_record_count": len(matching_expected_records),
         "jit_module_available_any": jit_module_available_any,
         "jit_enabled_any": jit_enabled_any,
+        "matching_expected_executable_jit_module_available_any": matching_jit_module_available_any,
+        "matching_expected_executable_jit_enabled_any": matching_jit_enabled_any,
         "compiled_function_count_max": compiled_function_count_max,
         "compiled_during_run": bool(
             compiled_function_count_max is not None and compiled_function_count_max > 0
         ),
+        "matching_expected_executable_compiled_function_count_max": (
+            matching_compiled_function_count_max
+        ),
+        "matching_expected_executable_compiled_during_run": bool(
+            matching_compiled_function_count_max is not None
+            and matching_compiled_function_count_max > 0
+        ),
         "static_loader_statuses": static_loader_statuses,
         "error_count": len(errors),
+        "matching_expected_executable_error_count": len(matching_errors),
+        "cinderx_module_not_found_count": cinderx_module_not_found_count,
+        "matching_expected_executable_module_not_found_count": matching_module_not_found_count,
         "errors": errors[:5],
+        "matching_expected_executable_errors": matching_errors[:5],
     }
 
 
@@ -2912,6 +3063,7 @@ def run_pyperformance_suite(
         if pyperformance_bootstrap_env:
             runtime_bootstrap_env = dict(pyperformance_bootstrap_env)
             runtime_bootstrap_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
+            runtime_bootstrap_env["CXC_PYPERF_EXPECTED_EXECUTABLE"] = str(target.executable)
 
         expect_post_run_jit_audit = (
             target.key == "cpython-cinderx"
@@ -2924,6 +3076,8 @@ def run_pyperformance_suite(
             if runtime_bootstrap_env is None:
                 runtime_bootstrap_env = dict(os.environ)
             runtime_bootstrap_env["CXC_PYPERF_JIT_AUDIT_DIR"] = jit_audit_tempdir.name
+
+        command = _with_pyperformance_inherit_environ(command, env=runtime_bootstrap_env)
 
         try:
             if runtime_bootstrap_env is not None:
@@ -2953,6 +3107,55 @@ def run_pyperformance_suite(
                         "post-run JIT audit did not detect compiled functions during "
                         f"pyperformance execution: {jit_audit_summary}"
                     )
+                expected_executable = jit_audit_summary.get("expected_executable")
+                if expected_executable:
+                    matching_record_count = int(
+                        jit_audit_summary.get("matching_expected_executable_record_count") or 0
+                    )
+                    if matching_record_count <= 0:
+                        raise ValueError(
+                            "post-run JIT audit did not record any entries for expected executable "
+                            f"{expected_executable!r}: {jit_audit_summary}"
+                        )
+                    if (
+                        int(
+                            jit_audit_summary.get(
+                                "matching_expected_executable_module_not_found_count"
+                            )
+                            or 0
+                        )
+                        > 0
+                    ):
+                        raise ValueError(
+                            "post-run JIT audit detected cinderx import failures for expected "
+                            f"executable {expected_executable!r}: {jit_audit_summary}"
+                        )
+                    if (
+                        jit_audit_summary.get(
+                            "matching_expected_executable_jit_module_available_any"
+                        )
+                        is not True
+                    ):
+                        raise ValueError(
+                            "post-run JIT audit did not detect cinderx.jit for expected executable "
+                            f"{expected_executable!r}: {jit_audit_summary}"
+                        )
+                    if (
+                        jit_audit_summary.get("matching_expected_executable_jit_enabled_any")
+                        is not True
+                    ):
+                        raise ValueError(
+                            "post-run JIT audit did not detect jit_enabled=True for expected "
+                            f"executable {expected_executable!r}: {jit_audit_summary}"
+                        )
+                    if (
+                        jit_audit_summary.get("matching_expected_executable_compiled_during_run")
+                        is not True
+                    ):
+                        raise ValueError(
+                            "post-run JIT audit did not detect compiled functions for expected "
+                            f"executable {expected_executable!r}: {jit_audit_summary}"
+                        )
         except (ValueError, OSError, json.JSONDecodeError) as exc:
             message = f"pyperformance execution failed ({exc})"
             if target.key == "cpython":
@@ -3256,21 +3459,101 @@ def preflight_pyperformance_suite(
     if target is None or target.executable is None:
         raise ValueError("No usable Python runtime found for pyperformance preflight.")
 
-    commands = [
+    commands: list[list[str]] = [
         [str(target.executable), "-m", "pyperformance", "--help"],
         [str(target.executable), "-m", "pyperformance", "run", "--help"],
     ]
-    command_text = [" ".join(command) for command in commands]
+    quick_run_tempdir = tempfile.TemporaryDirectory(prefix="cxc-pyperf-preflight-run-")
+    quick_run_output = Path(quick_run_tempdir.name) / "preflight-run.json"
+    commands.append(
+        [
+            str(target.executable),
+            "-m",
+            "pyperformance",
+            "run",
+            "--debug-single-value",
+            "--benchmarks",
+            "nbody",
+            "--output",
+            str(quick_run_output),
+        ]
+    )
+    command_text: list[str] = []
     jit_probe_payload: dict[str, Any] | None = None
+    jit_audit_summary: dict[str, Any] | None = None
+    preflight_jit_audit_tempdir: tempfile.TemporaryDirectory[str] | None = None
+    expect_jit_audit = target.key == "cpython-cinderx" and _profile_expects_jit_compilation(
+        resolved_bootstrap.profile
+    )
 
     try:
         preflight_env: dict[str, str] | None = None
         if resolved_bootstrap.env:
             preflight_env = dict(resolved_bootstrap.env)
             preflight_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
+            preflight_env["CXC_PYPERF_EXPECTED_EXECUTABLE"] = str(target.executable)
+        if expect_jit_audit:
+            preflight_jit_audit_tempdir = tempfile.TemporaryDirectory(
+                prefix="cxc-pyperf-preflight-jit-audit-"
+            )
+            if preflight_env is None:
+                preflight_env = dict(os.environ)
+            preflight_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
+            preflight_env["CXC_PYPERF_EXPECTED_EXECUTABLE"] = str(target.executable)
+            preflight_env["CXC_PYPERF_JIT_AUDIT_DIR"] = preflight_jit_audit_tempdir.name
 
         for command in commands:
-            _run_command(command, timeout_s=timeout_seconds, env=preflight_env)
+            command_with_inherit = _with_pyperformance_inherit_environ(command, env=preflight_env)
+            _run_command(command_with_inherit, timeout_s=timeout_seconds, env=preflight_env)
+            command_text.append(" ".join(command_with_inherit))
+
+        if expect_jit_audit and preflight_jit_audit_tempdir is not None:
+            jit_audit_summary = _collect_pyperformance_jit_audit(
+                Path(preflight_jit_audit_tempdir.name)
+            )
+            if int(jit_audit_summary.get("record_count") or 0) <= 0:
+                raise ValueError(
+                    "Preflight quick-run JIT audit wrote no records under resolved bootstrap "
+                    f"settings: {jit_audit_summary}"
+                )
+            expected_executable = jit_audit_summary.get("expected_executable")
+            if expected_executable:
+                matching_record_count = int(
+                    jit_audit_summary.get("matching_expected_executable_record_count") or 0
+                )
+                if matching_record_count <= 0:
+                    raise ValueError(
+                        "Preflight quick-run JIT audit recorded no entries for expected executable "
+                        f"{expected_executable!r}: {jit_audit_summary}"
+                    )
+                if (
+                    int(
+                        jit_audit_summary.get("matching_expected_executable_module_not_found_count")
+                        or 0
+                    )
+                    > 0
+                ):
+                    raise ValueError(
+                        "Preflight quick-run JIT audit saw cinderx import failures for expected "
+                        f"executable {expected_executable!r}: {jit_audit_summary}"
+                    )
+                if (
+                    jit_audit_summary.get("matching_expected_executable_jit_module_available_any")
+                    is not True
+                ):
+                    raise ValueError(
+                        "Preflight quick-run JIT audit did not detect cinderx.jit for expected "
+                        f"executable {expected_executable!r}: {jit_audit_summary}"
+                    )
+                if (
+                    jit_audit_summary.get("matching_expected_executable_jit_enabled_any")
+                    is not True
+                ):
+                    raise ValueError(
+                        "Preflight quick-run JIT audit did not detect jit_enabled=True "
+                        "for expected "
+                        f"executable {expected_executable!r}: {jit_audit_summary}"
+                    )
 
         if target.key == "cpython-cinderx" and _profile_expects_jit_compilation(
             resolved_bootstrap.profile
@@ -3300,6 +3583,9 @@ def preflight_pyperformance_suite(
             f"Preflight failed for pyperformance bootstrap on runtime {target.key!r}: {exc}"
         ) from exc
     finally:
+        quick_run_tempdir.cleanup()
+        if preflight_jit_audit_tempdir is not None:
+            preflight_jit_audit_tempdir.cleanup()
         if resolved_bootstrap.tempdir is not None:
             resolved_bootstrap.tempdir.cleanup()
 
@@ -3320,6 +3606,10 @@ def preflight_pyperformance_suite(
         notes.append(
             "JIT probe observed compiled function with payload: "
             f"{json.dumps(jit_probe_payload, sort_keys=True)}"
+        )
+    if jit_audit_summary is not None:
+        notes.append(
+            f"Quick-run JIT audit summary: {json.dumps(jit_audit_summary, sort_keys=True)}"
         )
 
     return PyperformancePreflightResult(

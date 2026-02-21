@@ -526,10 +526,13 @@ def test_collect_pyperformance_jit_audit(tmp_path: Path) -> None:
 
     payload = runner._collect_pyperformance_jit_audit(audit_dir)
     assert payload["record_count"] == 2
+    assert payload["expected_executable"] is None
+    assert payload["matching_expected_executable_record_count"] == 0
     assert payload["jit_module_available_any"] is True
     assert payload["jit_enabled_any"] is True
     assert payload["compiled_function_count_max"] == 4
     assert payload["compiled_during_run"] is True
+    assert payload["cinderx_module_not_found_count"] == 0
     assert payload["static_loader_statuses"] == ["installed"]
 
 
@@ -688,6 +691,21 @@ def test_preflight_pyperformance_uses_cinderx_runtime_with_auto_profile(
         if len(args) >= 3 and args[1] == "-m" and args[2] == "pyperformance":
             observed_commands.append(list(args))
             observed_env_by_command.append(dict(env or {}))
+            audit_dir = (env or {}).get("CXC_PYPERF_JIT_AUDIT_DIR")
+            if audit_dir:
+                payload = {
+                    "jit_module_available": True,
+                    "jit_enabled": True,
+                    "compiled_function_count": 2,
+                    "static_loader_status": "not-requested",
+                    "expected_executable": (env or {}).get("CXC_PYPERF_EXPECTED_EXECUTABLE"),
+                    "sys_executable": (env or {}).get("CXC_PYPERF_EXPECTED_EXECUTABLE"),
+                }
+                Path(audit_dir).mkdir(parents=True, exist_ok=True)
+                (Path(audit_dir) / f"jit-audit-{len(observed_commands)}.json").write_text(
+                    json.dumps(payload),
+                    encoding="utf-8",
+                )
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="ok", stderr="")
         if len(args) >= 3 and args[1] == "-c" and "cinderx.jit" in args[2]:
             payload = {
@@ -721,8 +739,10 @@ def test_preflight_pyperformance_uses_cinderx_runtime_with_auto_profile(
     assert result.bootstrap_profile == runner.AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE
     assert result.bootstrap_profile_source == "auto-default"
     assert result.bootstrap_target_runtime_key == "cpython-cinderx"
-    assert any(command[-1] == "--help" for command in observed_commands)
+    assert any("--help" in command for command in observed_commands)
     assert any("run" in command for command in observed_commands)
+    assert any("--debug-single-value" in command for command in observed_commands)
+    assert all("--inherit-environ" in command for command in observed_commands)
     assert observed_env_by_command
     assert all(
         env.get("CXC_PYPERF_RUNTIME_KEY") == "cpython-cinderx" for env in observed_env_by_command
