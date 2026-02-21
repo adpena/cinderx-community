@@ -1541,18 +1541,14 @@ def _prepare_pyperformance_bootstrap(
                 try:
                     distutils_version = importlib.import_module("setuptools._distutils.version")
                 except Exception:
-                    from packaging.version import InvalidVersion
-                    from packaging.version import Version
+                    import re
 
                     distutils_version = types.ModuleType("distutils.version")
 
                     class LooseVersion:
                         def __init__(self, vstring=None):
                             self.vstring = "" if vstring is None else str(vstring)
-                            try:
-                                self._parsed = Version(self.vstring)
-                            except InvalidVersion:
-                                self._parsed = None
+                            self._parsed = self._parse(self.vstring)
 
                         def __repr__(self):
                             return f"LooseVersion ('{self.vstring}')"
@@ -1560,10 +1556,29 @@ def _prepare_pyperformance_bootstrap(
                         def __str__(self):
                             return self.vstring
 
+                        @staticmethod
+                        def _parse(value: str):
+                            parts = []
+                            for raw in re.split(r"[._-]", value):
+                                token = raw.strip()
+                                if not token:
+                                    continue
+                                if token.isdigit():
+                                    parts.append((0, int(token)))
+                                    continue
+                                split_alpha_num = re.findall(r"\\d+|[a-zA-Z]+", token)
+                                if not split_alpha_num:
+                                    parts.append((1, token.lower()))
+                                    continue
+                                for item in split_alpha_num:
+                                    if item.isdigit():
+                                        parts.append((0, int(item)))
+                                    else:
+                                        parts.append((1, item.lower()))
+                            return tuple(parts)
+
                         def _cmp_key(self):
-                            if self._parsed is not None:
-                                return (0, self._parsed)
-                            return (1, self.vstring)
+                            return self._parsed
 
                         def _coerce(self, other):
                             if isinstance(other, LooseVersion):
