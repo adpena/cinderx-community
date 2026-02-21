@@ -1536,14 +1536,69 @@ def _prepare_pyperformance_bootstrap(
 
             os.environ.setdefault("SETUPTOOLS_USE_DISTUTILS", "local")
             try:
-                import setuptools  # noqa: F401
-                import distutils.version  # noqa: F401
+                import types
+
+                try:
+                    distutils_version = importlib.import_module("setuptools._distutils.version")
+                except Exception:
+                    from packaging.version import InvalidVersion
+                    from packaging.version import Version
+
+                    distutils_version = types.ModuleType("distutils.version")
+
+                    class LooseVersion:
+                        def __init__(self, vstring=None):
+                            self.vstring = "" if vstring is None else str(vstring)
+                            try:
+                                self._parsed = Version(self.vstring)
+                            except InvalidVersion:
+                                self._parsed = None
+
+                        def __repr__(self):
+                            return f"LooseVersion ('{self.vstring}')"
+
+                        def __str__(self):
+                            return self.vstring
+
+                        def _cmp_key(self):
+                            if self._parsed is not None:
+                                return (0, self._parsed)
+                            return (1, self.vstring)
+
+                        def _coerce(self, other):
+                            if isinstance(other, LooseVersion):
+                                return other
+                            return LooseVersion(other)
+
+                        def __eq__(self, other):
+                            return self._cmp_key() == self._coerce(other)._cmp_key()
+
+                        def __lt__(self, other):
+                            return self._cmp_key() < self._coerce(other)._cmp_key()
+
+                        def __le__(self, other):
+                            return self._cmp_key() <= self._coerce(other)._cmp_key()
+
+                        def __gt__(self, other):
+                            return self._cmp_key() > self._coerce(other)._cmp_key()
+
+                        def __ge__(self, other):
+                            return self._cmp_key() >= self._coerce(other)._cmp_key()
+
+                    distutils_version.LooseVersion = LooseVersion
+
+                distutils_module = sys.modules.get("distutils")
+                if distutils_module is None:
+                    distutils_module = types.ModuleType("distutils")
+                    sys.modules["distutils"] = distutils_module
+                distutils_module.version = distutils_version
+                sys.modules["distutils.version"] = distutils_version
             except Exception as exc:
-                raise RuntimeError(
-                    "distutils compatibility is required for legacy pyperformance benchmarks "
-                    "on Python 3.14+. Ensure setuptools is installed and "
-                    "SETUPTOOLS_USE_DISTUTILS=local."
-                ) from exc
+                print(
+                    "[cxc-pyperf-bootstrap] distutils compatibility setup failed: "
+                    f"{type(exc).__name__}: {exc}",
+                    file=sys.stderr,
+                )
 
         def _write_jit_audit_record() -> None:
             if not should_apply or not audit_dir:
