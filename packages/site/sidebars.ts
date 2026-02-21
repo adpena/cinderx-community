@@ -21,7 +21,13 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Concepts',
-      items: ['concepts/cinderx-vs-cinder', 'concepts/jit-compiler', 'concepts/static-python']
+      items: [
+        'concepts/cinderx-vs-cinder',
+        'concepts/jit-compiler',
+        'concepts/jit-runtime-config',
+        'concepts/static-python',
+        'concepts/static-python-usage'
+      ]
     },
     {
       type: 'category',

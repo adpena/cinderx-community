@@ -63,13 +63,13 @@ CINDERX_PYTHON=/path/to/cinderx-python bash scripts/bench/run_quickstart_matrix.
 Default behavior for that run:
 
 - plain `cpython` lane remains unmodified
-- `cpython-cinderx` lane auto-applies `cinderx-all-features`
+- `cpython-cinderx` lane auto-applies `cinderx-all-features` (`JIT all` + static loader)
 
-Optional profile override:
+Optional profile matrix:
 
 ```bash
 CINDERX_PYTHON=/path/to/cinderx-python \
-PYPERF_BOOTSTRAP_PROFILE=cinderx-jit-compile-after-n-calls \
+PYPERF_BOOTSTRAP_PROFILES=cinderx-jit-all,cinderx-jit-auto,cinderx-jit-compile-after-n-calls \
 PYPERF_BOOTSTRAP_JIT_COMPILE_AFTER_N_CALLS=40000 \
 bash scripts/bench/run_quickstart_matrix.sh
 ```
@@ -132,6 +132,7 @@ $CINDERX_PYTHON scripts/tutorials/runtime_identity_report.py
 Project-style bootstrap helper:
 
 ```bash
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode all
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --install-static-loader
 ```

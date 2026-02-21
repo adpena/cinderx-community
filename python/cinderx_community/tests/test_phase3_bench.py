@@ -394,6 +394,7 @@ def test_resolve_pyperformance_bootstrap_profile_all_features() -> None:
     assert threshold is None
     assert inline_code is not None
     assert "cinderx.jit" in inline_code
+    assert "compile_after_n_calls(0)" in inline_code
     assert "strict_stubs_dir" in inline_code
     assert "PYTHONSTRICTMODULESTUBSPATH" in inline_code
     assert "Strict module stubs path does not exist" in inline_code
@@ -407,10 +408,36 @@ def test_describe_cinderx_pyperformance_features_all_features() -> None:
         resolved_bootstrap_jit_compile_after_n_calls=None,
     )
     assert features["profile"] == "cinderx-all-features"
-    assert features["jit_mode"] == "auto"
+    assert features["jit_mode"] == "all"
+    assert features["jit_compile_after_n_calls"] == 0
     assert features["static_loader_enabled"] is True
     assert features["static_loader_enable_patching"] is True
-    assert features["summary"] == "JIT auto + static loader (patching)"
+    assert features["summary"] == "JIT all + static loader (patching)"
+
+
+def test_resolve_pyperformance_bootstrap_profile_jit_all() -> None:
+    inline_code, profile, threshold, source_mode = runner._resolve_pyperformance_bootstrap_inline(
+        inline_code=None,
+        profile="cinderx-jit-all",
+        jit_compile_after_n_calls=None,
+    )
+    assert source_mode == "profile"
+    assert profile == "cinderx-jit-all"
+    assert threshold is None
+    assert inline_code is not None
+    assert "compile_after_n_calls(0)" in inline_code
+
+
+def test_describe_cinderx_pyperformance_features_jit_all() -> None:
+    features = runner._describe_cinderx_pyperformance_features(
+        resolved_bootstrap_profile="cinderx-jit-all",
+        bootstrap_inline_sha256="abc123",
+        resolved_bootstrap_jit_compile_after_n_calls=None,
+    )
+    assert features["profile"] == "cinderx-jit-all"
+    assert features["jit_mode"] == "all"
+    assert features["jit_compile_after_n_calls"] == 0
+    assert features["summary"] == "JIT all"
 
 
 def test_describe_cinderx_pyperformance_features_custom_inline() -> None:
@@ -423,6 +450,15 @@ def test_describe_cinderx_pyperformance_features_custom_inline() -> None:
     assert features["jit_mode"] is None
     assert features["static_loader_enabled"] is None
     assert features["static_loader_enable_patching"] is None
+
+
+def test_profile_expects_jit_compilation() -> None:
+    assert runner._profile_expects_jit_compilation("cinderx-all-features") is True
+    assert runner._profile_expects_jit_compilation("cinderx-jit-all") is True
+    assert runner._profile_expects_jit_compilation("cinderx-jit-compile-after-n-calls") is True
+    assert runner._profile_expects_jit_compilation("cinderx-jit-disable") is False
+    assert runner._profile_expects_jit_compilation("cinderx-static-loader") is False
+    assert runner._profile_expects_jit_compilation(None) is False
 
 
 def test_resolve_pyperformance_bootstrap_rejects_profile_inline_conflict() -> None:
@@ -562,6 +598,23 @@ def test_preflight_pyperformance_uses_cinderx_runtime_with_auto_profile(
             observed_commands.append(list(args))
             observed_env_by_command.append(dict(env or {}))
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="ok", stderr="")
+        if len(args) >= 3 and args[1] == "-c" and "cinderx.jit" in args[2]:
+            payload = {
+                "available": True,
+                "jit_module_available": True,
+                "jit_enabled": True,
+                "compile_after_n_calls": 0,
+                "compiled": True,
+                "compiled_count": 1,
+                "used_is_jit_compiled": True,
+                "error": None,
+            }
+            return subprocess.CompletedProcess(
+                args=args,
+                returncode=0,
+                stdout=json.dumps(payload),
+                stderr="",
+            )
         return original_run_command(args, timeout_s=timeout_s, env=env)
 
     monkeypatch.setattr(runner, "_run_command", fake_run_command)
@@ -587,6 +640,7 @@ def test_preflight_pyperformance_uses_cinderx_runtime_with_auto_profile(
         env.get("CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY") == "cpython-cinderx"
         for env in observed_env_by_command
     )
+    assert any("JIT probe observed compiled function" in note for note in result.notes)
 
 
 def test_preflight_pyperformance_fails_fast_on_launcher_error(tmp_path: Path, monkeypatch) -> None:

@@ -21,11 +21,12 @@ You should see:
 - CinderX runtime hook visibility (`install_frame_evaluator`, `watch_sys_modules`, etc.)
 - JIT capability/state (`is_enabled`, `compile_after_n_calls`, available JIT entrypoints)
 - static-loader entrypoint discovery (`cinderx.compiler.strict.loader.install`)
-- environment toggles snapshot (`PYTHONJITAUTO`, `PYTHONJITDISABLE`, `PYTHONINSTALLSTRICTLOADER`, ...)
+- environment toggles snapshot (`PYTHONJITALL`, `PYTHONJITAUTO`, `PYTHONJITDISABLE`, `PYTHONSTRICTMODULESTUBSPATH`, ...)
 
 ## 2) Try project-style bootstrap actions directly
 
 ```bash
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode all
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode compile-after-n-calls --jit-compile-after-n-calls 40000
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --install-static-loader
@@ -70,12 +71,13 @@ Optional benchmark bootstrap profile experiments:
 
 ```bash
 CINDERX_PYTHON=/path/to/cinderx-python \
-PYPERF_BOOTSTRAP_PROFILE=cinderx-jit-compile-after-n-calls \
+PYPERF_BOOTSTRAP_PROFILES=cinderx-jit-all,cinderx-jit-auto,cinderx-jit-compile-after-n-calls \
 PYPERF_BOOTSTRAP_JIT_COMPILE_AFTER_N_CALLS=40000 \
 bash scripts/bench/run_quickstart_matrix.sh
 ```
 
-Without `PYPERF_BOOTSTRAP_PROFILE`, pyperformance CinderX runs auto-apply `cinderx-all-features`
-on the `cpython-cinderx` lane and keep plain `cpython` as control.
+Without `PYPERF_BOOTSTRAP_PROFILE(S)`, pyperformance CinderX runs auto-apply `cinderx-all-features`
+on the `cpython-cinderx` lane and keep plain `cpython` as control. In this repo that default
+means eager JIT (`jit-all`) plus static loader install when strict stubs are available.
 
 If guard checks fail, keep results labeled as diagnostics.

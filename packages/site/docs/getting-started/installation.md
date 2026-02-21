@@ -69,6 +69,7 @@ print('cinderx import ok')
 
 ```bash
 .venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode all
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 ```
 

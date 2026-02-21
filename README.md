@@ -235,6 +235,7 @@ bash scripts/bench/install_comparison_toolchain.sh
 bash scripts/bench/run_quickstart_matrix.sh
 bash scripts/bench/sync_site_data_from_bench_results.sh
 .venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode all
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 .venv/bin/python scripts/tutorials/json_hot_path.py --iterations 4000 --payload-size 512
 ```
@@ -276,7 +277,7 @@ cd python
 ```
 
 - With `--cpython-cinderx`, the harness auto-applies profile `cinderx-all-features` to the
-  `cpython-cinderx` lane.
+  `cpython-cinderx` lane (`JIT all` + static loader when strict stubs are available).
 - Plain `cpython` remains the control lane (no bootstrap execution).
 - Override the default profile with `--pyperformance-bootstrap-profile <name>`, or use
   `--pyperformance-bootstrap-inline` for custom experiments.
@@ -285,6 +286,7 @@ Available profile options:
 
 - `cinderx-init`
 - `cinderx-all-features`
+- `cinderx-jit-all`
 - `cinderx-jit-auto`
 - `cinderx-jit-compile-after-n-calls` (plus
   `--pyperformance-bootstrap-jit-compile-after-n-calls <N>`)

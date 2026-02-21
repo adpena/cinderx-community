@@ -46,6 +46,7 @@ CINDERX_PYTHON=/path/to/cinderx-python make bench-pyperformance-local-cinderx
 Default pyperformance CinderX behavior:
 
 - with `--cpython-cinderx`, the harness auto-applies profile `cinderx-all-features`
+  (`JIT all` + static loader when stubs are available)
 - bootstrap targets only `cpython-cinderx`; plain `cpython` remains control lane
 
 Optional profile override:
@@ -64,6 +65,8 @@ Other source-backed profile options:
 
 - `cinderx-init`
 - `cinderx-all-features`
+- `cinderx-jit-all`
+- `cinderx-jit-auto`
 - `cinderx-jit-compile-after-n-calls` + `--pyperformance-bootstrap-jit-compile-after-n-calls`
 - `cinderx-jit-disable`
 - `cinderx-static-loader`
@@ -122,6 +125,7 @@ Quick user-project script checks:
 
 ```bash
 .venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode all
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 .venv/bin/python scripts/tutorials/json_hot_path.py --iterations 4000 --payload-size 512
 ```

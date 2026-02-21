@@ -57,7 +57,9 @@ def activate() -> None:
     jit_mode = os.getenv("CINDERX_JIT_MODE", "leave-default")
     if jit_mode != "leave-default":
         cinderx_jit = importlib.import_module("cinderx.jit")
-        if jit_mode == "auto":
+        if jit_mode == "all":
+            cinderx_jit.compile_after_n_calls(0)
+        elif jit_mode == "auto":
             cinderx_jit.auto()
         elif jit_mode == "compile-after-n-calls":
             threshold = int(os.getenv("CINDERX_JIT_THRESHOLD", "40000"))
@@ -91,6 +93,7 @@ Sources:
 Use the helper script:
 
 ```bash
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode all
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode compile-after-n-calls --jit-compile-after-n-calls 40000
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --install-static-loader
@@ -99,7 +102,7 @@ Use the helper script:
 ## 5) Wire this into pyperformance runs
 
 For benchmark runs with `--cpython-cinderx`, the harness auto-applies CinderX profile
-`cinderx-all-features` on the `cpython-cinderx` lane:
+`cinderx-all-features` on the `cpython-cinderx` lane (`JIT all` + static loader):
 
 ```bash
 cxc bench run \
@@ -130,6 +133,8 @@ Other supported profile values:
 
 - `cinderx-init`
 - `cinderx-all-features`
+- `cinderx-jit-all`
+- `cinderx-jit-auto`
 - `cinderx-jit-compile-after-n-calls` (plus `--pyperformance-bootstrap-jit-compile-after-n-calls`)
 - `cinderx-jit-disable`
 - `cinderx-static-loader`

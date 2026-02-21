@@ -12,7 +12,7 @@ import sys
 from typing import Any
 
 DEFAULT_JIT_COMPILE_AFTER_N_CALLS = 40000
-JIT_MODES = ("leave-default", "auto", "compile-after-n-calls", "disable")
+JIT_MODES = ("leave-default", "all", "auto", "compile-after-n-calls", "disable")
 
 
 def parse_args() -> argparse.Namespace:
@@ -69,7 +69,7 @@ def apply_bootstrap(args: argparse.Namespace) -> dict[str, Any]:
         "strict_stubs_exists": None,
     }
 
-    if args.jit_compile_after_n_calls <= 0:
+    if args.jit_mode == "compile-after-n-calls" and args.jit_compile_after_n_calls <= 0:
         report["warnings"].append("--jit-compile-after-n-calls must be > 0; skipping JIT threshold")
         args.jit_compile_after_n_calls = DEFAULT_JIT_COMPILE_AFTER_N_CALLS
 
@@ -113,7 +113,13 @@ def apply_bootstrap(args: argparse.Namespace) -> dict[str, Any]:
                 f"import cinderx.jit failed while applying jit mode: {type(exc).__name__}: {exc}"
             )
         else:
-            if args.jit_mode == "auto" and hasattr(jit_module, "auto"):
+            if args.jit_mode == "all" and hasattr(jit_module, "compile_after_n_calls"):
+                _safe_call(jit_module.compile_after_n_calls, 0)
+                report["actions_applied"].append("cinderx.jit.compile_after_n_calls(0)")
+            elif args.jit_mode == "all" and hasattr(jit_module, "auto"):
+                _safe_call(jit_module.auto)
+                report["actions_applied"].append("cinderx.jit.auto()")
+            elif args.jit_mode == "auto" and hasattr(jit_module, "auto"):
                 _safe_call(jit_module.auto)
                 report["actions_applied"].append("cinderx.jit.auto()")
             elif args.jit_mode == "compile-after-n-calls" and hasattr(

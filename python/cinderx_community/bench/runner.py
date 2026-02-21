@@ -34,6 +34,7 @@ PUBLISHABLE_SUITES = [SMOKE_SUITE, PYPERFORMANCE_SUITE]
 PYPERFORMANCE_BOOTSTRAP_PROFILES = [
     "cinderx-init",
     "cinderx-all-features",
+    "cinderx-jit-all",
     "cinderx-jit-auto",
     "cinderx-jit-compile-after-n-calls",
     "cinderx-jit-disable",
@@ -976,8 +977,11 @@ def _render_pyperformance_bootstrap_profile(
                         import cinderx.jit as cinderx_jit
                     except Exception:
                         cinderx_jit = None
-                    if cinderx_jit is not None and hasattr(cinderx_jit, "auto"):
-                        cinderx_jit.auto()
+                    if cinderx_jit is not None:
+                        if hasattr(cinderx_jit, "compile_after_n_calls"):
+                            cinderx_jit.compile_after_n_calls(0)
+                        elif hasattr(cinderx_jit, "auto"):
+                            cinderx_jit.auto()
                     try:
                         strict_loader = importlib.import_module("cinderx.compiler.strict.loader")
                     except Exception:
@@ -1013,6 +1017,29 @@ def _render_pyperformance_bootstrap_profile(
                             except ValueError as exc:
                                 if "Strict module stubs path does not exist" not in str(exc):
                                     raise
+                """
+            ).strip(),
+            None,
+        )
+
+    if profile == "cinderx-jit-all":
+        return (
+            textwrap.dedent(
+                """
+                import importlib.util
+                if importlib.util.find_spec("cinderx") is not None:
+                    import cinderx
+                    if hasattr(cinderx, "init"):
+                        cinderx.init()
+                    try:
+                        import cinderx.jit as cinderx_jit
+                    except Exception:
+                        cinderx_jit = None
+                    if cinderx_jit is not None:
+                        if hasattr(cinderx_jit, "compile_after_n_calls"):
+                            cinderx_jit.compile_after_n_calls(0)
+                        elif hasattr(cinderx_jit, "auto"):
+                            cinderx_jit.auto()
                 """
             ).strip(),
             None,
@@ -1315,10 +1342,15 @@ def _describe_cinderx_pyperformance_features(
     feature_summary = "none (plain runtime control)"
 
     if interpreted_profile == "cinderx-all-features":
-        jit_mode = "auto"
+        jit_mode = "all"
+        jit_compile_after_n_calls = 0
         static_loader_enabled = True
         static_loader_enable_patching = True
-        feature_summary = "JIT auto + static loader (patching)"
+        feature_summary = "JIT all + static loader (patching)"
+    elif interpreted_profile == "cinderx-jit-all":
+        jit_mode = "all"
+        jit_compile_after_n_calls = 0
+        feature_summary = "JIT all"
     elif interpreted_profile == "cinderx-jit-auto":
         jit_mode = "auto"
         feature_summary = "JIT auto"
@@ -1359,6 +1391,121 @@ def _describe_cinderx_pyperformance_features(
         "static_loader_enabled": static_loader_enabled,
         "static_loader_enable_patching": static_loader_enable_patching,
     }
+
+
+def _profile_expects_jit_compilation(profile: str | None) -> bool:
+    return profile in {
+        "cinderx-all-features",
+        "cinderx-jit-all",
+        "cinderx-jit-auto",
+        "cinderx-jit-compile-after-n-calls",
+    }
+
+
+def _run_pyperformance_jit_compilation_probe(
+    *, executable: Path, timeout_seconds: int, env: dict[str, str] | None
+) -> dict[str, Any]:
+    script = textwrap.dedent(
+        """
+        import importlib
+        import importlib.util
+        import json
+
+        payload = {
+            "available": False,
+            "jit_module_available": False,
+            "jit_enabled": None,
+            "compile_after_n_calls": None,
+            "compiled": False,
+            "compiled_count": None,
+            "used_is_jit_compiled": False,
+            "error": None,
+        }
+
+        try:
+            if importlib.util.find_spec("cinderx") is None:
+                payload["error"] = "cinderx module not found"
+            else:
+                import cinderx
+
+                payload["available"] = True
+                if hasattr(cinderx, "init"):
+                    cinderx.init()
+                try:
+                    cinderx_jit = importlib.import_module("cinderx.jit")
+                except Exception as exc:
+                    payload["error"] = f"import cinderx.jit failed: {type(exc).__name__}: {exc}"
+                    cinderx_jit = None
+                if cinderx_jit is not None:
+                    payload["jit_module_available"] = True
+                    if hasattr(cinderx_jit, "is_enabled"):
+                        try:
+                            payload["jit_enabled"] = bool(cinderx_jit.is_enabled())
+                        except Exception:
+                            payload["jit_enabled"] = None
+                    if hasattr(cinderx_jit, "get_compile_after_n_calls"):
+                        try:
+                            payload["compile_after_n_calls"] = (
+                                cinderx_jit.get_compile_after_n_calls()
+                            )
+                        except Exception:
+                            payload["compile_after_n_calls"] = None
+
+                    def hot(count: int) -> int:
+                        total = 0
+                        for idx in range(count):
+                            total += (idx & 7)
+                        return total
+
+                    threshold = payload["compile_after_n_calls"]
+                    if isinstance(threshold, int):
+                        call_count = min(max(threshold + 64, 1024), 200000)
+                    else:
+                        call_count = 4096
+                    for _ in range(call_count):
+                        hot(64)
+
+                    if hasattr(cinderx_jit, "is_jit_compiled"):
+                        try:
+                            payload["compiled"] = bool(cinderx_jit.is_jit_compiled(hot))
+                            payload["used_is_jit_compiled"] = True
+                        except Exception:
+                            payload["compiled"] = False
+                    if not payload["compiled"] and hasattr(cinderx_jit, "get_compiled_functions"):
+                        try:
+                            compiled_functions = cinderx_jit.get_compiled_functions()
+                            payload["compiled_count"] = len(compiled_functions)
+                            payload["compiled"] = any(
+                                getattr(func, "__code__", None) is hot.__code__
+                                for func in compiled_functions
+                            )
+                        except Exception:
+                            payload["compiled_count"] = None
+        except Exception as exc:
+            payload["error"] = f"{type(exc).__name__}: {exc}"
+
+        print(json.dumps(payload))
+        """
+    ).strip()
+    completed = _run_command(
+        [str(executable), "-c", script],
+        timeout_s=timeout_seconds,
+        env=env,
+    )
+    stdout = completed.stdout.strip()
+    for line in reversed(stdout.splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    raise ValueError(
+        f"JIT probe command produced no parseable JSON output. stdout_tail={stdout[-800:]!r}"
+    )
 
 
 def _resolve_pyperformance_bootstrap_for_targets(
@@ -2829,14 +2976,40 @@ def preflight_pyperformance_suite(
         [str(target.executable), "-m", "pyperformance", "run", "--help"],
     ]
     command_text = [" ".join(command) for command in commands]
+    jit_probe_payload: dict[str, Any] | None = None
 
     try:
+        preflight_env: dict[str, str] | None = None
+        if resolved_bootstrap.env:
+            preflight_env = dict(resolved_bootstrap.env)
+            preflight_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
+
         for command in commands:
-            preflight_env: dict[str, str] | None = None
-            if resolved_bootstrap.env:
-                preflight_env = dict(resolved_bootstrap.env)
-                preflight_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
             _run_command(command, timeout_s=timeout_seconds, env=preflight_env)
+
+        if target.key == "cpython-cinderx" and _profile_expects_jit_compilation(
+            resolved_bootstrap.profile
+        ):
+            jit_probe_payload = _run_pyperformance_jit_compilation_probe(
+                executable=target.executable,
+                timeout_seconds=timeout_seconds,
+                env=preflight_env,
+            )
+            if not bool(jit_probe_payload.get("jit_module_available")):
+                raise ValueError(
+                    "JIT probe did not find cinderx.jit module under resolved bootstrap settings: "
+                    f"{jit_probe_payload}"
+                )
+            if jit_probe_payload.get("jit_enabled") is False:
+                raise ValueError(
+                    "JIT probe reported jit_enabled=False under resolved bootstrap settings: "
+                    f"{jit_probe_payload}"
+                )
+            if not bool(jit_probe_payload.get("compiled")):
+                raise ValueError(
+                    "JIT probe did not observe a JIT-compiled function under resolved bootstrap "
+                    f"settings: {jit_probe_payload}"
+                )
     except ValueError as exc:
         raise ValueError(
             f"Preflight failed for pyperformance bootstrap on runtime {target.key!r}: {exc}"
@@ -2858,6 +3031,11 @@ def preflight_pyperformance_suite(
         notes.append("Resolved bootstrap mode: custom inline.")
     else:
         notes.append("Resolved bootstrap mode: disabled.")
+    if jit_probe_payload is not None:
+        notes.append(
+            "JIT probe observed compiled function with payload: "
+            f"{json.dumps(jit_probe_payload, sort_keys=True)}"
+        )
 
     return PyperformancePreflightResult(
         suite="pyperformance-preflight",

@@ -69,6 +69,7 @@ make bench-pyperformance-local-cinderx
 
 ```bash
 .venv/bin/python scripts/tutorials/runtime_identity_report.py
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode all
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --install-static-loader
 ```
@@ -130,11 +131,12 @@ CI mitigation in this repo:
 If those are not present, publication is rejected to prevent CPython-framed headline comparisons.
 
 Pyperformance with `--cpython-cinderx` auto-applies profile `cinderx-all-features` on the
-`cpython-cinderx` lane (plain `cpython` remains control). For explicit profile overrides:
+`cpython-cinderx` lane (plain `cpython` remains control). In this repo that profile means
+`JIT all` + static loader. For explicit profile overrides:
 
 ```bash
 CINDERX_PYTHON=/path/to/cinderx-python \
-PYPERF_BOOTSTRAP_PROFILE=cinderx-jit-compile-after-n-calls \
+PYPERF_BOOTSTRAP_PROFILES=cinderx-jit-all,cinderx-jit-auto,cinderx-jit-compile-after-n-calls \
 PYPERF_BOOTSTRAP_JIT_COMPILE_AFTER_N_CALLS=40000 \
 bash scripts/bench/run_quickstart_matrix.sh
 ```

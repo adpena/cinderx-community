@@ -91,11 +91,21 @@ def cinderx_info() -> dict[str, Any]:
     if cinderx_jit is not None:
         jit_candidates = [
             "auto",
+            "get_compile_after_n_calls",
             "compile_after_n_calls",
             "disable",
             "enable",
             "is_enabled",
             "force_compile",
+            "is_jit_compiled",
+            "set_max_code_size",
+            "precompile_all",
+            "enable_hir_inliner",
+            "disable_hir_inliner",
+            "enable_specialized_opcodes",
+            "disable_specialized_opcodes",
+            "enable_emit_type_annotation_guards",
+            "disable_emit_type_annotation_guards",
         ]
         payload["jit"] = {
             "module_available": True,
@@ -121,9 +131,17 @@ def build_report() -> dict[str, Any]:
     env_keys = [
         "CINDERX_DISABLE",
         "PYTHON_GIL",
+        "PYTHONJITALL",
         "PYTHONJITAUTO",
         "PYTHONJITDISABLE",
+        "PYTHONJITDUMPASM",
+        "PYTHONJITDUMPSTATS",
+        "PYTHONJITMAXCODESIZE",
+        "PYTHONJITTYPEANNOTATIONGUARDS",
+        "PYTHONJITSPECIALIZEDOPCODES",
+        "PYTHONJITSUPPORTINSTRUMENTATION",
         "PYTHONINSTALLSTRICTLOADER",
+        "PYTHONSTRICTMODULESTUBSPATH",
         "PYTHONENABLEPATCHING",
     ]
     return {
@@ -192,15 +210,8 @@ def main() -> int:
     )
 
     env_payload = report["env"]
-    print(
-        "cinderx_env_toggles="
-        f"CINDERX_DISABLE:{env_payload['CINDERX_DISABLE']},"
-        f"PYTHON_GIL:{env_payload['PYTHON_GIL']},"
-        f"PYTHONJITAUTO:{env_payload['PYTHONJITAUTO']},"
-        f"PYTHONJITDISABLE:{env_payload['PYTHONJITDISABLE']},"
-        f"PYTHONINSTALLSTRICTLOADER:{env_payload['PYTHONINSTALLSTRICTLOADER']},"
-        f"PYTHONENABLEPATCHING:{env_payload['PYTHONENABLEPATCHING']}"
-    )
+    env_text = ",".join(f"{key}:{value}" for key, value in env_payload.items())
+    print(f"cinderx_env_toggles={env_text}")
     return 0
 
 

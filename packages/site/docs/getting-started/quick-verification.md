@@ -24,6 +24,7 @@ To inspect JIT/static-related runtime capabilities:
 To test project-style bootstrap actions:
 
 ```bash
+.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode all
 .venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode auto
 ```
 

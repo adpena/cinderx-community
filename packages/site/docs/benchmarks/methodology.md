@@ -31,7 +31,8 @@ Source: [pyperformance documentation](https://pyperformance.readthedocs.io/)
 ## CinderX bootstrap policy for pyperformance
 
 When `--cpython-cinderx` is provided, pyperformance runs auto-apply CinderX bootstrap profile
-`cinderx-all-features` via a temporary `sitecustomize` shim:
+`cinderx-all-features` via a temporary `sitecustomize` shim. In this repo, that profile now uses
+eager JIT (`jit-all` behavior) plus strict/static loader install:
 
 ```bash
 cxc bench run \
@@ -45,7 +46,7 @@ Notes:
 
 - This default bootstrap is lane-targeted: plain `cpython` remains the control run.
 - Override the default profile with `--pyperformance-bootstrap-profile <name>` when needed.
-- Supported profiles: `cinderx-init`, `cinderx-all-features`, `cinderx-jit-auto`,
+- Supported profiles: `cinderx-init`, `cinderx-all-features`, `cinderx-jit-all`, `cinderx-jit-auto`,
   `cinderx-jit-compile-after-n-calls`,
   `cinderx-jit-disable`, `cinderx-static-loader`, `cinderx-static-loader-patching`.
 - Custom inline hooks still exist via `--pyperformance-bootstrap-inline`, but profile mode is the
