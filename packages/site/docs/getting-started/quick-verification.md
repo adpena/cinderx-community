@@ -14,6 +14,8 @@ PY
 ```
 
 This verifies package import only. It does not confirm specific JIT/static features.
+Static Python specifically requires per-module `import __static__` markers; bootstrap/runtime checks
+cannot retroactively mark third-party modules as static.
 
 To inspect JIT/static-related runtime capabilities:
 

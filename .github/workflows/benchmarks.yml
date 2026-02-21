@@ -170,7 +170,7 @@ jobs:
           PYTHONSTRICTMODULESTUBSPATH: ${{ steps.cinderx_strict.outputs.strict_stubs_path }}
         run: |
           set -euo pipefail
-          for profile in cinderx-all-features cinderx-jit-all cinderx-jit-compile-after-n-calls; do
+          for profile in cinderx-jit-all cinderx-jit-compile-after-n-calls; do
             args=(
               .venv/bin/cxc bench preflight-pyperformance
               --python "${{ steps.cinderx_strict.outputs.python_bin }}"
@@ -185,6 +185,15 @@ jobs:
             echo "Running pyperformance preflight profile: $profile"
             "${args[@]}"
           done
+          echo "Running optional strict-loader preflight profile: cinderx-all-features"
+          if ! .venv/bin/cxc bench preflight-pyperformance \
+            --python "${{ steps.cinderx_strict.outputs.python_bin }}" \
+            --cpython-cinderx "${{ steps.cinderx_strict.outputs.cinderx_bin }}" \
+            --require-cinderx-baseline \
+            --timeout-seconds 90 \
+            --pyperformance-bootstrap-profile cinderx-all-features; then
+            echo "::warning::Optional cinderx-all-features preflight failed; publish path remains cinderx-jit-all."
+          fi
 
       - name: Run pyperformance suite (publishable full)
         env:
@@ -195,6 +204,7 @@ jobs:
             --python "${{ steps.cinderx_strict.outputs.python_bin }}" \
             --cpython-cinderx "${{ steps.cinderx_strict.outputs.cinderx_bin }}" \
             --require-cinderx-baseline \
+            --pyperformance-bootstrap-profile cinderx-jit-all \
             --out data/runs \
             --summary-out data/summary \
             --static-summary-out packages/site/static/data/summary

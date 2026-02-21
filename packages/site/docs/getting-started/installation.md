@@ -58,6 +58,12 @@ benchmark runs:
 export PYTHONSTRICTMODULESTUBSPATH="/path/from/strict_stubs_path"
 ```
 
+Benchmark profile expectation in this repo:
+
+- default publish path uses `cinderx-jit-all` (does not require strict stubs)
+- `cinderx-all-features` and `cinderx-static-loader*` require strict stubs and now fail fast when
+  stubs are missing
+
 ## Verify import only
 
 ```python

@@ -29,7 +29,7 @@ Repo-level governance and automation live in `.github/`, `README.md`, `CONTRIBUT
 - `make bench-pyperformance-local-cinderx-ci`: run local pyperformance CI-shape debug subset with required CinderX baseline.
 - `make bench-publish-check`: enforce CinderX-baselined publish guard for latest benchmark summaries.
 - `make bench-dossier`: export benchmark metadata dossier JSON under `data/summary/reports/`.
-- `CINDERX_PYTHON=/path/to/cinderx-python bash scripts/bench/run_quickstart_matrix.sh`: run quickstart matrix with default pyperformance CinderX feature bootstrap (`cpython` plain control + auto-bootstrap on `cpython-cinderx` lane only; default profile now maps to eager JIT + static loader path).
+- `CINDERX_PYTHON=/path/to/cinderx-python bash scripts/bench/run_quickstart_matrix.sh`: run quickstart matrix with default pyperformance CinderX bootstrap (`cpython` plain control + auto-bootstrap on `cpython-cinderx` lane only; default profile is `cinderx-jit-all`).
 - `CINDERX_PYTHON=/path/to/cinderx-python PYPERF_BOOTSTRAP_PROFILES=cinderx-jit-all,cinderx-jit-auto,cinderx-jit-compile-after-n-calls bash scripts/bench/run_quickstart_matrix.sh`: run a profile matrix for JIT behavior checks.
 - `.venv/bin/python scripts/tutorials/cinderx_project_bootstrap.py --jit-mode all`: apply project-style CinderX bootstrap actions (eager JIT/static-loader path) for local verification.
 - Python environments and package installs are managed with `uv` (see setup below).
@@ -64,6 +64,7 @@ uv pip install --python .venv/bin/python pyperformance
   - Linux/static loader caveat:
     - Some CinderX wheels can omit `cinderx/compiler/strict/stubs`, which causes `Strict module stubs path does not exist` when strict/static loader is installed.
     - Use `scripts/ci/install_and_probe_cinderx.sh` to resolve a fallback stubs path and export `strict_stubs_path`; benchmark steps should pass it via `PYTHONSTRICTMODULESTUBSPATH`.
+    - In benchmark bootstrap profiles that request static loader (`cinderx-all-features`, `cinderx-static-loader*`), missing stubs are now fail-fast (no silent fallback).
 
 ## Coding Style & Naming Conventions
 - Follow `.editorconfig`: UTF-8, LF, trailing whitespace trimmed, final newline.

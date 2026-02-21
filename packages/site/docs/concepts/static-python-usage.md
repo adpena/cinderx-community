@@ -42,6 +42,10 @@ If the resolved stubs path does not exist, loader init raises:
 
 `ValueError: Strict module stubs path does not exist: ...`
 
+In this repo's benchmark harness, profiles that request static loader now fail fast on this
+condition (`cinderx-all-features`, `cinderx-static-loader`, `cinderx-static-loader-patching`)
+instead of silently skipping loader install.
+
 ## Runtime hooks Static Python relies on
 
 When static code is present, loader initialization routes through:
@@ -82,6 +86,13 @@ from __static__ import int64, cbool, box
 from cinderx.static import is_static_module
 print(is_static_module(your_module))
 ```
+
+Important boundary:
+
+- importing `__static__` in bootstrap does not make other modules static
+- each module that should be static must include `import __static__` itself
+- benchmark bootstrap can configure runtime hooks, but it cannot rewrite pyperformance modules into
+  static mode
 
 ## `__static__` entry points developers actually use
 

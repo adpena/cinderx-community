@@ -63,7 +63,8 @@ CINDERX_PYTHON=/path/to/cinderx-python bash scripts/bench/run_quickstart_matrix.
 Default behavior for that run:
 
 - plain `cpython` lane remains unmodified
-- `cpython-cinderx` lane auto-applies `cinderx-all-features` (`JIT all` + static loader)
+- `cpython-cinderx` lane auto-applies `cinderx-jit-all` (`JIT all`)
+- static-loader profiles are opt-in and fail fast when strict stubs are missing
 
 Optional profile matrix:
 

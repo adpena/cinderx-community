@@ -31,8 +31,8 @@ Source: [pyperformance documentation](https://pyperformance.readthedocs.io/)
 ## CinderX bootstrap policy for pyperformance
 
 When `--cpython-cinderx` is provided, pyperformance runs auto-apply CinderX bootstrap profile
-`cinderx-all-features` via a temporary `sitecustomize` shim. In this repo, that profile now uses
-eager JIT (`jit-all` behavior) plus strict/static loader install:
+`cinderx-jit-all` via a temporary `sitecustomize` shim. In this repo, that default profile uses
+eager JIT (`jit-all` behavior) without strict-loader dependency in the publish path:
 
 ```bash
 cxc bench run \
@@ -45,13 +45,19 @@ cxc bench run \
 Notes:
 
 - This default bootstrap is lane-targeted: plain `cpython` remains the control run.
+- Static Python is not auto-injected by bootstrap; module source still needs `import __static__`
+  markers to run in static mode.
 - Override the default profile with `--pyperformance-bootstrap-profile <name>` when needed.
 - Supported profiles: `cinderx-init`, `cinderx-all-features`, `cinderx-jit-all`, `cinderx-jit-auto`,
   `cinderx-jit-compile-after-n-calls`,
   `cinderx-jit-disable`, `cinderx-static-loader`, `cinderx-static-loader-patching`.
+- Static-loader profiles are fail-fast now: strict stubs must exist (`PYTHONSTRICTMODULESTUBSPATH`
+  or packaged `compiler/strict/stubs`), otherwise bootstrap raises and run stops.
 - Custom inline hooks still exist via `--pyperformance-bootstrap-inline`, but profile mode is the
   preferred path for reproducible CinderX feature experiments.
 - The dashboard surfaces bootstrap-enabled state, profile, mode, and bootstrap hash for traceability.
+- Publishable pyperformance summaries now require post-run JIT audit evidence for the CinderX lane
+  (`jit_module_available_any=true`, `jit_enabled_any=true`, `compiled_during_run=true`).
 
 Example smoke run with CinderX baseline plus interpreter comparison runtime:
 

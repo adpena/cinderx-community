@@ -224,8 +224,8 @@ def bench_run(
                 "Named pyperformance bootstrap profile. Supported values: "
                 + ", ".join(PYPERFORMANCE_BOOTSTRAP_PROFILES)
                 + ". When omitted and --cpython-cinderx is provided, "
-                "cinderx-all-features is auto-applied to the cpython-cinderx lane "
-                "(eager JIT + static loader when strict stubs are available)."
+                "cinderx-jit-all is auto-applied to the cpython-cinderx lane "
+                "(eager JIT with no strict-loader dependency)."
             ),
         ),
     ] = None,

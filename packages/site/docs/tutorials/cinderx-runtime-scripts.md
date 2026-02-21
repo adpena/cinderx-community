@@ -76,8 +76,12 @@ PYPERF_BOOTSTRAP_JIT_COMPILE_AFTER_N_CALLS=40000 \
 bash scripts/bench/run_quickstart_matrix.sh
 ```
 
-Without `PYPERF_BOOTSTRAP_PROFILE(S)`, pyperformance CinderX runs auto-apply `cinderx-all-features`
+Without `PYPERF_BOOTSTRAP_PROFILE(S)`, pyperformance CinderX runs auto-apply `cinderx-jit-all`
 on the `cpython-cinderx` lane and keep plain `cpython` as control. In this repo that default
-means eager JIT (`jit-all`) plus static loader install when strict stubs are available.
+means eager JIT (`jit-all`) without strict-loader dependency in the publish path.
+
+If you opt into `cinderx-all-features` or `cinderx-static-loader*`, strict stubs must exist
+(`PYTHONSTRICTMODULESTUBSPATH` or packaged `compiler/strict/stubs`) and missing stubs now fail
+fast.
 
 If guard checks fail, keep results labeled as diagnostics.

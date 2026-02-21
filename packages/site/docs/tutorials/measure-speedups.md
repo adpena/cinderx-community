@@ -45,9 +45,11 @@ CINDERX_PYTHON=/path/to/cinderx-python make bench-pyperformance-local-cinderx
 
 Default pyperformance CinderX behavior:
 
-- with `--cpython-cinderx`, the harness auto-applies profile `cinderx-all-features`
-  (`JIT all` + static loader when stubs are available)
+- with `--cpython-cinderx`, the harness auto-applies profile `cinderx-jit-all`
+  (`JIT all`, no strict-loader dependency in default publish path)
 - bootstrap targets only `cpython-cinderx`; plain `cpython` remains control lane
+- static mode is still module-marked (`import __static__` in source); bootstrap cannot retroactively
+  static-compile pyperformance modules
 
 Optional profile override:
 
@@ -71,6 +73,9 @@ Other source-backed profile options:
 - `cinderx-jit-disable`
 - `cinderx-static-loader`
 - `cinderx-static-loader-patching`
+
+If you choose `cinderx-all-features` or `cinderx-static-loader*`, strict stubs must exist
+(`PYTHONSTRICTMODULESTUBSPATH` or packaged `compiler/strict/stubs`) and missing stubs now fail fast.
 
 Comparator support note:
 
@@ -119,6 +124,8 @@ For published claims in this repo, only use runs that are:
 - `metadata.run_config.ci_mode = false` (full pyperformance)
 - `metadata.run_config.pyperformance_bootstrap_target_runtime_key = "cpython-cinderx"`
 - `metadata.run_config.pyperformance_bootstrap_profile_source` is `auto-default` (or explicitly documented override)
+- `metadata.run_config.pyperformance_cinderx_jit_audit_required = true`
+- `runtimes[].jit_audit` for `cpython-cinderx` reports `compiled_during_run = true`
 - accepted by `make bench-publish-check`
 
 Quick user-project script checks:

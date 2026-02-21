@@ -82,6 +82,8 @@ Call `activate()` at the very top of your process entrypoint, before other app i
   importing modules that should be strict/static.
 - Launcher module itself should not be strict/static-marked.
 - For static modules, use `import __static__` as module marker.
+- Bootstrap cannot force static mode onto third-party modules; each module that should be static
+  must include the marker in its own source.
 
 Sources:
 
@@ -102,7 +104,7 @@ Use the helper script:
 ## 5) Wire this into pyperformance runs
 
 For benchmark runs with `--cpython-cinderx`, the harness auto-applies CinderX profile
-`cinderx-all-features` on the `cpython-cinderx` lane (`JIT all` + static loader):
+`cinderx-jit-all` on the `cpython-cinderx` lane (`JIT all`):
 
 ```bash
 cxc bench run \
@@ -115,7 +117,8 @@ cxc bench run \
 Harness behavior:
 
 - `cpython` runtime row runs without bootstrap (plain CPython baseline)
-- `cinderx-all-features` bootstrap is applied only to `cpython-cinderx` runtime row
+- `cinderx-jit-all` bootstrap is applied only to `cpython-cinderx` runtime row
+- static-loader profiles are opt-in and fail fast when strict stubs are missing
 
 If you need a different bootstrap profile, override with:
 
@@ -139,3 +142,6 @@ Other supported profile values:
 - `cinderx-jit-disable`
 - `cinderx-static-loader`
 - `cinderx-static-loader-patching`
+
+If you pick `cinderx-all-features`/`cinderx-static-loader*`, ensure strict stubs are available
+(`PYTHONSTRICTMODULESTUBSPATH` or packaged `cinderx/compiler/strict/stubs`).

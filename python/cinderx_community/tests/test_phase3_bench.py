@@ -34,6 +34,8 @@ def _publishable_summary_payload(*, suite: str) -> dict[str, object]:
             "run_config": {
                 "ci_mode": False,
                 "require_cinderx_baseline": True,
+                "pyperformance_cinderx_jit_audit_required": True,
+                "pyperformance_cinderx_static_loader_required": False,
             },
             "toolchain": {
                 "benchmark_repo_sha": "deadbeef",
@@ -54,6 +56,13 @@ def _publishable_summary_payload(*, suite: str) -> dict[str, object]:
                 "runtime_label": "CPython + CinderX",
                 "runtime_version": "Python 3.14.3",
                 "runtime_details": {"implementation": "CPython"},
+                "jit_audit": {
+                    "record_count": 3,
+                    "jit_module_available_any": True,
+                    "jit_enabled_any": True,
+                    "compiled_during_run": True,
+                    "static_loader_statuses": ["not-requested"],
+                },
                 "executed": True,
             }
         ],
@@ -296,6 +305,19 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
             if env:
                 runtime_key = env.get("CXC_PYPERF_RUNTIME_KEY", "unknown")
                 observed_env_by_runtime_key[runtime_key] = dict(env)
+                audit_dir = env.get("CXC_PYPERF_JIT_AUDIT_DIR")
+                if runtime_key == "cpython-cinderx" and audit_dir:
+                    audit_payload = {
+                        "jit_module_available": True,
+                        "jit_enabled": True,
+                        "compiled_function_count": 7,
+                        "static_loader_status": "not-requested",
+                    }
+                    Path(audit_dir).mkdir(parents=True, exist_ok=True)
+                    (Path(audit_dir) / "jit-audit-test.json").write_text(
+                        json.dumps(audit_payload),
+                        encoding="utf-8",
+                    )
             assert "--benchmarks" in args
             assert "nbody" in args
             runtime_arg = args[args.index("--python") + 1]
@@ -353,6 +375,8 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
     )
     assert run_config["pyperformance_bootstrap_profile_source"] == "auto-default"
     assert run_config["pyperformance_bootstrap_target_runtime_key"] == "cpython-cinderx"
+    assert run_config["pyperformance_cinderx_jit_audit_required"] is True
+    assert run_config["pyperformance_cinderx_static_loader_required"] is False
     assert observed_env_by_runtime_key["cpython"]["CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY"] == (
         "cpython-cinderx"
     )
@@ -367,6 +391,10 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
     )
     assert any(row["memory_rss_bytes"] is not None for row in summary["benchmarks"])
     assert any(row["compile_time_seconds"] is not None for row in summary["benchmarks"])
+    cinderx_runtime = next(
+        item for item in summary["runtimes"] if item.get("runtime") == "cpython-cinderx"
+    )
+    assert cinderx_runtime["jit_audit"]["compiled_during_run"] is True
 
 
 def test_resolve_pyperformance_bootstrap_profile_compile_after_defaults() -> None:
@@ -397,7 +425,8 @@ def test_resolve_pyperformance_bootstrap_profile_all_features() -> None:
     assert "compile_after_n_calls(0)" in inline_code
     assert "strict_stubs_dir" in inline_code
     assert "PYTHONSTRICTMODULESTUBSPATH" in inline_code
-    assert "Strict module stubs path does not exist" in inline_code
+    assert "CXC_PYPERF_STATIC_LOADER_STATUS" in inline_code
+    assert "requires strict loader stubs" in inline_code
     assert "strict_loader.install(enable_patching=True)" in inline_code
 
 
@@ -412,7 +441,7 @@ def test_describe_cinderx_pyperformance_features_all_features() -> None:
     assert features["jit_compile_after_n_calls"] == 0
     assert features["static_loader_enabled"] is True
     assert features["static_loader_enable_patching"] is True
-    assert features["summary"] == "JIT all + static loader (patching)"
+    assert features["summary"] == "JIT all + static loader (patching; strict stubs required)"
 
 
 def test_resolve_pyperformance_bootstrap_profile_jit_all() -> None:
@@ -459,6 +488,49 @@ def test_profile_expects_jit_compilation() -> None:
     assert runner._profile_expects_jit_compilation("cinderx-jit-disable") is False
     assert runner._profile_expects_jit_compilation("cinderx-static-loader") is False
     assert runner._profile_expects_jit_compilation(None) is False
+
+
+def test_profile_expects_static_loader() -> None:
+    assert runner._profile_expects_static_loader("cinderx-all-features") is True
+    assert runner._profile_expects_static_loader("cinderx-static-loader") is True
+    assert runner._profile_expects_static_loader("cinderx-static-loader-patching") is True
+    assert runner._profile_expects_static_loader("cinderx-jit-all") is False
+    assert runner._profile_expects_static_loader(None) is False
+
+
+def test_collect_pyperformance_jit_audit(tmp_path: Path) -> None:
+    audit_dir = tmp_path / "jit-audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    (audit_dir / "jit-audit-1.json").write_text(
+        json.dumps(
+            {
+                "jit_module_available": True,
+                "jit_enabled": True,
+                "compiled_function_count": 4,
+                "static_loader_status": "installed",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (audit_dir / "jit-audit-2.json").write_text(
+        json.dumps(
+            {
+                "jit_module_available": True,
+                "jit_enabled": False,
+                "compiled_function_count": 0,
+                "static_loader_status": "installed",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = runner._collect_pyperformance_jit_audit(audit_dir)
+    assert payload["record_count"] == 2
+    assert payload["jit_module_available_any"] is True
+    assert payload["jit_enabled_any"] is True
+    assert payload["compiled_function_count_max"] == 4
+    assert payload["compiled_during_run"] is True
+    assert payload["static_loader_statuses"] == ["installed"]
 
 
 def test_resolve_pyperformance_bootstrap_rejects_profile_inline_conflict() -> None:
@@ -513,6 +585,19 @@ def test_run_pyperformance_suite_records_bootstrap_profile_metadata(
             if env:
                 runtime_key = env.get("CXC_PYPERF_RUNTIME_KEY", "unknown")
                 observed_env_by_runtime_key[runtime_key] = dict(env)
+                audit_dir = env.get("CXC_PYPERF_JIT_AUDIT_DIR")
+                if runtime_key == "cpython-cinderx" and audit_dir:
+                    audit_payload = {
+                        "jit_module_available": True,
+                        "jit_enabled": True,
+                        "compiled_function_count": 5,
+                        "static_loader_status": "not-requested",
+                    }
+                    Path(audit_dir).mkdir(parents=True, exist_ok=True)
+                    (Path(audit_dir) / "jit-audit-test.json").write_text(
+                        json.dumps(audit_payload),
+                        encoding="utf-8",
+                    )
             runtime_arg = args[args.index("--python") + 1]
             output_arg = Path(args[args.index("--output") + 1])
             scale = 1.0 if "cpython-cinderx" in runtime_arg else 1.1
@@ -551,6 +636,8 @@ def test_run_pyperformance_suite_records_bootstrap_profile_metadata(
     assert run_config["pyperformance_bootstrap_profile_source"] == "explicit"
     assert run_config["pyperformance_bootstrap_jit_compile_after_n_calls"] == 7
     assert run_config["pyperformance_bootstrap_target_runtime_key"] == "cpython-cinderx"
+    assert run_config["pyperformance_cinderx_jit_audit_required"] is True
+    assert run_config["pyperformance_cinderx_static_loader_required"] is False
     assert run_config["pyperformance_bootstrap_inline_sha256"]
     assert summary["metadata"]["toolchain"]["pyperformance_bootstrap_mode"] == (
         "sitecustomize-profile"
@@ -572,6 +659,10 @@ def test_run_pyperformance_suite_records_bootstrap_profile_metadata(
         "compile_after_n_calls(7)"
         in observed_env_by_runtime_key["cpython"]["CXC_PYPERF_BOOTSTRAP_INLINE"]
     )
+    cinderx_runtime = next(
+        item for item in summary["runtimes"] if item.get("runtime") == "cpython-cinderx"
+    )
+    assert cinderx_runtime["jit_audit"]["compiled_during_run"] is True
 
 
 def test_preflight_pyperformance_uses_cinderx_runtime_with_auto_profile(
@@ -918,6 +1009,43 @@ def test_verify_publishable_summaries_rejects_unsupported_runtime_rows(tmp_path:
         assert "unsupported runtime key(s)" in str(exc)
     else:
         raise AssertionError("Expected publish verification failure for unsupported runtime rows")
+
+
+def test_verify_publishable_summaries_rejects_missing_pyperformance_jit_audit(
+    tmp_path: Path,
+) -> None:
+    summary_root = tmp_path / "summary"
+    summary_root.mkdir(parents=True, exist_ok=True)
+
+    pyperf_payload = _publishable_summary_payload(suite=PYPERFORMANCE_SUITE)
+    runtimes = pyperf_payload.get("runtimes")
+    assert isinstance(runtimes, list)
+    assert runtimes
+    runtime_row = runtimes[0]
+    assert isinstance(runtime_row, dict)
+    runtime_row.pop("jit_audit", None)
+
+    (summary_root / "latest-pyperformance.json").write_text(
+        json.dumps(pyperf_payload),
+        encoding="utf-8",
+    )
+    _write_index(
+        summary_root / "index.json",
+        suites=[PYPERFORMANCE_SUITE],
+        latest_file_by_suite={PYPERFORMANCE_SUITE: "latest-pyperformance.json"},
+    )
+
+    try:
+        runner.verify_publishable_summaries(
+            summary_root=summary_root,
+            suites=[PYPERFORMANCE_SUITE],
+        )
+    except ValueError as exc:
+        assert "jit_audit" in str(exc)
+    else:
+        raise AssertionError(
+            "Expected publish verification failure for missing pyperformance jit_audit"
+        )
 
 
 def test_verify_publishable_summaries_rejects_static_mismatch(tmp_path: Path) -> None:

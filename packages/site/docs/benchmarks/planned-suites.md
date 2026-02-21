@@ -23,8 +23,8 @@ Use `--require-cinderx-baseline` for comparison publishing policy enforcement.
 Provided `--cpython-cinderx` runtimes are validated and rejected if they do not expose CinderX.
 Optional pyperformance bootstrap profiles are available for controlled feature-enablement
 experiments (`--pyperformance-bootstrap-profile ...`). When `--cpython-cinderx` is provided
-without an explicit profile, the harness auto-applies `cinderx-all-features` to the
-`cpython-cinderx` lane only; plain `cpython` remains control. In this repo, `cinderx-all-features`
-maps to eager JIT (`jit-all`) plus strict/static loader when stubs are available. Custom inline
-hooks are retained as an escape hatch.
+without an explicit profile, the harness auto-applies `cinderx-jit-all` to the
+`cpython-cinderx` lane only; plain `cpython` remains control.
+Static-loader profiles remain available, but they now fail fast when strict stubs are missing.
+Custom inline hooks are retained as an escape hatch.
 :::

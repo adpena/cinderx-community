@@ -276,11 +276,15 @@ cd python
   --require-cinderx-baseline
 ```
 
-- With `--cpython-cinderx`, the harness auto-applies profile `cinderx-all-features` to the
-  `cpython-cinderx` lane (`JIT all` + static loader when strict stubs are available).
+- With `--cpython-cinderx`, the harness auto-applies profile `cinderx-jit-all` to the
+  `cpython-cinderx` lane (`JIT all`, no strict-loader dependency in default publish path).
 - Plain `cpython` remains the control lane (no bootstrap execution).
 - Override the default profile with `--pyperformance-bootstrap-profile <name>`, or use
   `--pyperformance-bootstrap-inline` for custom experiments.
+- `cinderx-all-features` and static-loader profiles are fail-fast now: they require strict stubs
+  (`PYTHONSTRICTMODULESTUBSPATH` or packaged `compiler/strict/stubs`) and do not silently degrade.
+- Static Python is module-marked (`import __static__` in benchmark module source). Bootstrap can
+  install the strict loader, but it cannot retroactively mark pyperformance modules as static.
 
 Available profile options:
 

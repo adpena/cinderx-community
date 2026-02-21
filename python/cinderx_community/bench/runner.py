@@ -42,7 +42,7 @@ PYPERFORMANCE_BOOTSTRAP_PROFILES = [
     "cinderx-static-loader-patching",
 ]
 DEFAULT_PYPERFORMANCE_JIT_COMPILE_AFTER_N_CALLS = 40000
-AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE = "cinderx-all-features"
+AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE = "cinderx-jit-all"
 
 WORKLOAD_TAXONOMY = [
     {
@@ -685,6 +685,8 @@ def _validate_publishable_summary_payload(
             failures.append(f"{source}: metadata.host.ram_total_bytes is missing.")
 
     run_config = metadata.get("run_config")
+    pyperf_jit_audit_required = False
+    pyperf_static_loader_required = False
     if not isinstance(run_config, dict):
         failures.append(f"{source}: metadata.run_config is missing.")
     else:
@@ -692,6 +694,18 @@ def _validate_publishable_summary_payload(
             failures.append(f"{source}: metadata.run_config.require_cinderx_baseline must be true.")
         if "ci_mode" not in run_config:
             failures.append(f"{source}: metadata.run_config.ci_mode is missing.")
+        if expected_suite == PYPERFORMANCE_SUITE:
+            pyperf_jit_audit_required = bool(
+                run_config.get("pyperformance_cinderx_jit_audit_required")
+            )
+            pyperf_static_loader_required = bool(
+                run_config.get("pyperformance_cinderx_static_loader_required")
+            )
+            if not pyperf_jit_audit_required:
+                failures.append(
+                    f"{source}: metadata.run_config.pyperformance_cinderx_jit_audit_required "
+                    "must be true for publishable pyperformance summaries."
+                )
 
     toolchain = metadata.get("toolchain")
     if not isinstance(toolchain, dict):
@@ -745,6 +759,42 @@ def _validate_publishable_summary_payload(
             failures.append(f"{source}: runtime row 'cpython-cinderx' is missing runtime_version.")
         if "runtime_details" not in cinderx_runtime:
             failures.append(f"{source}: runtime row 'cpython-cinderx' is missing runtime_details.")
+        if expected_suite == PYPERFORMANCE_SUITE:
+            jit_audit = cinderx_runtime.get("jit_audit")
+            if not isinstance(jit_audit, dict):
+                failures.append(
+                    f"{source}: runtime row 'cpython-cinderx' is missing jit_audit payload."
+                )
+            else:
+                if int(jit_audit.get("record_count") or 0) <= 0:
+                    failures.append(
+                        f"{source}: runtime row 'cpython-cinderx' jit_audit.record_count "
+                        "must be > 0."
+                    )
+                if jit_audit.get("jit_module_available_any") is not True:
+                    failures.append(
+                        f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                        "must report jit_module_available_any=true."
+                    )
+                if jit_audit.get("jit_enabled_any") is not True:
+                    failures.append(
+                        f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                        "must report jit_enabled_any=true."
+                    )
+                if pyperf_jit_audit_required and jit_audit.get("compiled_during_run") is not True:
+                    failures.append(
+                        f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                        "must report compiled_during_run=true."
+                    )
+                if pyperf_static_loader_required:
+                    statuses = jit_audit.get("static_loader_statuses")
+                    status_list = statuses if isinstance(statuses, list) else []
+                    if "installed" not in status_list:
+                        failures.append(
+                            f"{source}: runtime row 'cpython-cinderx' jit_audit "
+                            "must include static_loader_statuses=['installed', ...] when "
+                            "static loader is required."
+                        )
 
     benchmarks = payload.get("benchmarks")
     benchmark_rows = (
@@ -982,41 +1032,54 @@ def _render_pyperformance_bootstrap_profile(
                             cinderx_jit.compile_after_n_calls(0)
                         elif hasattr(cinderx_jit, "auto"):
                             cinderx_jit.auto()
+                    os.environ["CXC_PYPERF_STATIC_LOADER_STATUS"] = "required"
                     try:
                         strict_loader = importlib.import_module("cinderx.compiler.strict.loader")
+                    except Exception as exc:
+                        raise RuntimeError(
+                            "cinderx-all-features requires cinderx.compiler.strict.loader, "
+                            f"but it could not be imported: {type(exc).__name__}: {exc}"
+                        ) from exc
+                    if not hasattr(strict_loader, "install"):
+                        raise RuntimeError(
+                            "cinderx-all-features requires strict_loader.install(), "
+                            "but it was missing."
+                        )
+
+                    strict_stubs_dir = None
+                    configured_stub_path = None
+                    try:
+                        xoptions = getattr(sys, "_xoptions", {}) or {}
+                        configured_stub_path = (
+                            xoptions.get("strict-module-stubs-path")
+                            or os.environ.get("PYTHONSTRICTMODULESTUBSPATH")
+                        )
                     except Exception:
-                        strict_loader = None
-                    if strict_loader is not None and hasattr(strict_loader, "install"):
-                        strict_stubs_dir = None
                         configured_stub_path = None
-                        try:
-                            xoptions = getattr(sys, "_xoptions", {}) or {}
-                            configured_stub_path = (
-                                xoptions.get("strict-module-stubs-path")
-                                or os.environ.get("PYTHONSTRICTMODULESTUBSPATH")
-                            )
-                        except Exception:
-                            configured_stub_path = None
-                        if configured_stub_path:
-                            configured_candidate = pathlib.Path(configured_stub_path).expanduser()
-                            if configured_candidate.exists():
-                                strict_stubs_dir = configured_candidate
-                        cinderx_file = getattr(cinderx, "__file__", None)
-                        if strict_stubs_dir is None and cinderx_file:
-                            candidate = (
-                                pathlib.Path(cinderx_file).resolve().parent
-                                / "compiler"
-                                / "strict"
-                                / "stubs"
-                            )
-                            if candidate.exists():
-                                strict_stubs_dir = candidate
-                        if strict_stubs_dir is not None:
-                            try:
-                                strict_loader.install(enable_patching=True)
-                            except ValueError as exc:
-                                if "Strict module stubs path does not exist" not in str(exc):
-                                    raise
+                    if configured_stub_path:
+                        configured_candidate = pathlib.Path(configured_stub_path).expanduser()
+                        if configured_candidate.exists():
+                            strict_stubs_dir = configured_candidate
+                    cinderx_file = getattr(cinderx, "__file__", None)
+                    if strict_stubs_dir is None and cinderx_file:
+                        candidate = (
+                            pathlib.Path(cinderx_file).resolve().parent
+                            / "compiler"
+                            / "strict"
+                            / "stubs"
+                        )
+                        if candidate.exists():
+                            strict_stubs_dir = candidate
+
+                    if strict_stubs_dir is None:
+                        raise RuntimeError(
+                            "cinderx-all-features requires strict loader stubs. "
+                            "Set PYTHONSTRICTMODULESTUBSPATH or install a CinderX build that "
+                            "ships compiler/strict/stubs."
+                        )
+
+                    strict_loader.install(enable_patching=True)
+                    os.environ["CXC_PYPERF_STATIC_LOADER_STATUS"] = "installed"
                 """
             ).strip(),
             None,
@@ -1123,41 +1186,54 @@ def _render_pyperformance_bootstrap_profile(
                     import cinderx
                     if hasattr(cinderx, "init"):
                         cinderx.init()
+                    os.environ["CXC_PYPERF_STATIC_LOADER_STATUS"] = "required"
                     try:
                         strict_loader = importlib.import_module("cinderx.compiler.strict.loader")
+                    except Exception as exc:
+                        raise RuntimeError(
+                            "cinderx-static-loader requires cinderx.compiler.strict.loader, "
+                            f"but it could not be imported: {type(exc).__name__}: {exc}"
+                        ) from exc
+                    if not hasattr(strict_loader, "install"):
+                        raise RuntimeError(
+                            "cinderx-static-loader requires strict_loader.install(), "
+                            "but it was missing."
+                        )
+
+                    strict_stubs_dir = None
+                    configured_stub_path = None
+                    try:
+                        xoptions = getattr(sys, "_xoptions", {}) or {}
+                        configured_stub_path = (
+                            xoptions.get("strict-module-stubs-path")
+                            or os.environ.get("PYTHONSTRICTMODULESTUBSPATH")
+                        )
                     except Exception:
-                        strict_loader = None
-                    if strict_loader is not None and hasattr(strict_loader, "install"):
-                        strict_stubs_dir = None
                         configured_stub_path = None
-                        try:
-                            xoptions = getattr(sys, "_xoptions", {}) or {}
-                            configured_stub_path = (
-                                xoptions.get("strict-module-stubs-path")
-                                or os.environ.get("PYTHONSTRICTMODULESTUBSPATH")
-                            )
-                        except Exception:
-                            configured_stub_path = None
-                        if configured_stub_path:
-                            configured_candidate = pathlib.Path(configured_stub_path).expanduser()
-                            if configured_candidate.exists():
-                                strict_stubs_dir = configured_candidate
-                        cinderx_file = getattr(cinderx, "__file__", None)
-                        if strict_stubs_dir is None and cinderx_file:
-                            candidate = (
-                                pathlib.Path(cinderx_file).resolve().parent
-                                / "compiler"
-                                / "strict"
-                                / "stubs"
-                            )
-                            if candidate.exists():
-                                strict_stubs_dir = candidate
-                        if strict_stubs_dir is not None:
-                            try:
-                                strict_loader.install()
-                            except ValueError as exc:
-                                if "Strict module stubs path does not exist" not in str(exc):
-                                    raise
+                    if configured_stub_path:
+                        configured_candidate = pathlib.Path(configured_stub_path).expanduser()
+                        if configured_candidate.exists():
+                            strict_stubs_dir = configured_candidate
+                    cinderx_file = getattr(cinderx, "__file__", None)
+                    if strict_stubs_dir is None and cinderx_file:
+                        candidate = (
+                            pathlib.Path(cinderx_file).resolve().parent
+                            / "compiler"
+                            / "strict"
+                            / "stubs"
+                        )
+                        if candidate.exists():
+                            strict_stubs_dir = candidate
+
+                    if strict_stubs_dir is None:
+                        raise RuntimeError(
+                            "cinderx-static-loader requires strict loader stubs. "
+                            "Set PYTHONSTRICTMODULESTUBSPATH or install a CinderX build that "
+                            "ships compiler/strict/stubs."
+                        )
+
+                    strict_loader.install()
+                    os.environ["CXC_PYPERF_STATIC_LOADER_STATUS"] = "installed"
                 """
             ).strip(),
             None,
@@ -1176,41 +1252,55 @@ def _render_pyperformance_bootstrap_profile(
                     import cinderx
                     if hasattr(cinderx, "init"):
                         cinderx.init()
+                    os.environ["CXC_PYPERF_STATIC_LOADER_STATUS"] = "required"
                     try:
                         strict_loader = importlib.import_module("cinderx.compiler.strict.loader")
+                    except Exception as exc:
+                        raise RuntimeError(
+                            "cinderx-static-loader-patching requires "
+                            "cinderx.compiler.strict.loader, "
+                            f"but it could not be imported: {type(exc).__name__}: {exc}"
+                        ) from exc
+                    if not hasattr(strict_loader, "install"):
+                        raise RuntimeError(
+                            "cinderx-static-loader-patching requires strict_loader.install(), "
+                            "but it was missing."
+                        )
+
+                    strict_stubs_dir = None
+                    configured_stub_path = None
+                    try:
+                        xoptions = getattr(sys, "_xoptions", {}) or {}
+                        configured_stub_path = (
+                            xoptions.get("strict-module-stubs-path")
+                            or os.environ.get("PYTHONSTRICTMODULESTUBSPATH")
+                        )
                     except Exception:
-                        strict_loader = None
-                    if strict_loader is not None and hasattr(strict_loader, "install"):
-                        strict_stubs_dir = None
                         configured_stub_path = None
-                        try:
-                            xoptions = getattr(sys, "_xoptions", {}) or {}
-                            configured_stub_path = (
-                                xoptions.get("strict-module-stubs-path")
-                                or os.environ.get("PYTHONSTRICTMODULESTUBSPATH")
-                            )
-                        except Exception:
-                            configured_stub_path = None
-                        if configured_stub_path:
-                            configured_candidate = pathlib.Path(configured_stub_path).expanduser()
-                            if configured_candidate.exists():
-                                strict_stubs_dir = configured_candidate
-                        cinderx_file = getattr(cinderx, "__file__", None)
-                        if strict_stubs_dir is None and cinderx_file:
-                            candidate = (
-                                pathlib.Path(cinderx_file).resolve().parent
-                                / "compiler"
-                                / "strict"
-                                / "stubs"
-                            )
-                            if candidate.exists():
-                                strict_stubs_dir = candidate
-                        if strict_stubs_dir is not None:
-                            try:
-                                strict_loader.install(enable_patching=True)
-                            except ValueError as exc:
-                                if "Strict module stubs path does not exist" not in str(exc):
-                                    raise
+                    if configured_stub_path:
+                        configured_candidate = pathlib.Path(configured_stub_path).expanduser()
+                        if configured_candidate.exists():
+                            strict_stubs_dir = configured_candidate
+                    cinderx_file = getattr(cinderx, "__file__", None)
+                    if strict_stubs_dir is None and cinderx_file:
+                        candidate = (
+                            pathlib.Path(cinderx_file).resolve().parent
+                            / "compiler"
+                            / "strict"
+                            / "stubs"
+                        )
+                        if candidate.exists():
+                            strict_stubs_dir = candidate
+
+                    if strict_stubs_dir is None:
+                        raise RuntimeError(
+                            "cinderx-static-loader-patching requires strict loader stubs. "
+                            "Set PYTHONSTRICTMODULESTUBSPATH or install a CinderX build that "
+                            "ships compiler/strict/stubs."
+                        )
+
+                    strict_loader.install(enable_patching=True)
+                    os.environ["CXC_PYPERF_STATIC_LOADER_STATUS"] = "installed"
                 """
             ).strip(),
             None,
@@ -1270,7 +1360,12 @@ def _prepare_pyperformance_bootstrap(
     shim_root = Path(tempdir.name)
     sitecustomize = textwrap.dedent(
         """
+        import atexit
+        import importlib
+        import importlib.util
+        import json
         import os
+        import pathlib
         import sys
 
         bootstrap = os.environ.get("CXC_PYPERF_BOOTSTRAP_INLINE", "").strip()
@@ -1278,7 +1373,83 @@ def _prepare_pyperformance_bootstrap(
             "CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY", ""
         ).strip()
         runtime_key = os.environ.get("CXC_PYPERF_RUNTIME_KEY", "").strip()
+        audit_dir = os.environ.get("CXC_PYPERF_JIT_AUDIT_DIR", "").strip()
         should_apply = not bootstrap_target_runtime or runtime_key == bootstrap_target_runtime
+
+        def _write_jit_audit_record() -> None:
+            if not should_apply or not audit_dir:
+                return
+            payload = {
+                "runtime_key": runtime_key,
+                "bootstrap_target_runtime_key": bootstrap_target_runtime,
+                "jit_module_available": False,
+                "jit_enabled": None,
+                "compile_after_n_calls": None,
+                "compiled_function_count": None,
+                "runtime_stats_keys": [],
+                "static_loader_status": os.environ.get("CXC_PYPERF_STATIC_LOADER_STATUS"),
+                "error": None,
+            }
+            try:
+                if importlib.util.find_spec("cinderx") is not None:
+                    import cinderx
+
+                    if hasattr(cinderx, "init"):
+                        cinderx.init()
+                    try:
+                        cinderx_jit = importlib.import_module("cinderx.jit")
+                    except Exception as exc:
+                        payload["error"] = (
+                            f"import cinderx.jit failed: {type(exc).__name__}: {exc}"
+                        )
+                        cinderx_jit = None
+                    if cinderx_jit is not None:
+                        payload["jit_module_available"] = True
+                        if hasattr(cinderx_jit, "is_enabled"):
+                            try:
+                                payload["jit_enabled"] = bool(cinderx_jit.is_enabled())
+                            except Exception:
+                                payload["jit_enabled"] = None
+                        if hasattr(cinderx_jit, "get_compile_after_n_calls"):
+                            try:
+                                payload["compile_after_n_calls"] = (
+                                    cinderx_jit.get_compile_after_n_calls()
+                                )
+                            except Exception:
+                                payload["compile_after_n_calls"] = None
+                        if hasattr(cinderx_jit, "get_compiled_functions"):
+                            try:
+                                payload["compiled_function_count"] = len(
+                                    cinderx_jit.get_compiled_functions()
+                                )
+                            except Exception:
+                                payload["compiled_function_count"] = None
+                        if hasattr(cinderx_jit, "get_and_clear_runtime_stats"):
+                            try:
+                                runtime_stats = cinderx_jit.get_and_clear_runtime_stats()
+                                if isinstance(runtime_stats, dict):
+                                    payload["runtime_stats_keys"] = sorted(runtime_stats.keys())
+                            except Exception:
+                                payload["runtime_stats_keys"] = []
+                else:
+                    payload["error"] = "cinderx module not found"
+            except Exception as exc:  # pragma: no cover - best-effort telemetry
+                payload["error"] = f"{type(exc).__name__}: {exc}"
+
+            try:
+                audit_root = pathlib.Path(audit_dir)
+                audit_root.mkdir(parents=True, exist_ok=True)
+                audit_path = audit_root / f"jit-audit-{os.getpid()}.json"
+                audit_path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+            except Exception as exc:  # pragma: no cover - best-effort telemetry
+                print(
+                    f"[cxc-pyperf-bootstrap] jit audit write failed: {exc!r}",
+                    file=sys.stderr,
+                )
+
+        if should_apply and audit_dir:
+            atexit.register(_write_jit_audit_record)
+
         if bootstrap:
             if should_apply:
                 namespace = {}
@@ -1346,7 +1517,7 @@ def _describe_cinderx_pyperformance_features(
         jit_compile_after_n_calls = 0
         static_loader_enabled = True
         static_loader_enable_patching = True
-        feature_summary = "JIT all + static loader (patching)"
+        feature_summary = "JIT all + static loader (patching; strict stubs required)"
     elif interpreted_profile == "cinderx-jit-all":
         jit_mode = "all"
         jit_compile_after_n_calls = 0
@@ -1368,12 +1539,12 @@ def _describe_cinderx_pyperformance_features(
         jit_mode = "unchanged"
         static_loader_enabled = True
         static_loader_enable_patching = False
-        feature_summary = "static loader"
+        feature_summary = "static loader (strict stubs required)"
     elif interpreted_profile == "cinderx-static-loader-patching":
         jit_mode = "unchanged"
         static_loader_enabled = True
         static_loader_enable_patching = True
-        feature_summary = "static loader (patching)"
+        feature_summary = "static loader (patching; strict stubs required)"
     elif interpreted_profile == "cinderx-init":
         jit_mode = "unchanged"
         feature_summary = "cinderx.init only"
@@ -1399,6 +1570,64 @@ def _profile_expects_jit_compilation(profile: str | None) -> bool:
         "cinderx-jit-all",
         "cinderx-jit-auto",
         "cinderx-jit-compile-after-n-calls",
+    }
+
+
+def _profile_expects_static_loader(profile: str | None) -> bool:
+    return profile in {
+        "cinderx-all-features",
+        "cinderx-static-loader",
+        "cinderx-static-loader-patching",
+    }
+
+
+def _collect_pyperformance_jit_audit(audit_dir: Path) -> dict[str, Any]:
+    records: list[dict[str, Any]] = []
+    parse_failures: list[str] = []
+
+    for path in sorted(audit_dir.glob("jit-audit-*.json")):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            parse_failures.append(f"{path.name}: {exc}")
+            continue
+        if isinstance(payload, dict):
+            records.append(payload)
+
+    compiled_counts = [
+        int(value)
+        for value in (record.get("compiled_function_count") for record in records)
+        if isinstance(value, int)
+    ]
+    compiled_function_count_max = max(compiled_counts) if compiled_counts else None
+    jit_module_available_any = any(bool(record.get("jit_module_available")) for record in records)
+    jit_enabled_any = any(record.get("jit_enabled") is True for record in records)
+    static_loader_statuses = sorted(
+        {
+            str(value)
+            for value in (record.get("static_loader_status") for record in records)
+            if isinstance(value, str) and value.strip()
+        }
+    )
+    errors = [
+        str(value)
+        for value in (record.get("error") for record in records)
+        if isinstance(value, str) and value.strip()
+    ]
+
+    return {
+        "record_count": len(records),
+        "parse_failure_count": len(parse_failures),
+        "parse_failures": parse_failures[:5],
+        "jit_module_available_any": jit_module_available_any,
+        "jit_enabled_any": jit_enabled_any,
+        "compiled_function_count_max": compiled_function_count_max,
+        "compiled_during_run": bool(
+            compiled_function_count_max is not None and compiled_function_count_max > 0
+        ),
+        "static_loader_statuses": static_loader_statuses,
+        "error_count": len(errors),
+        "errors": errors[:5],
     }
 
 
@@ -2599,6 +2828,15 @@ def run_pyperformance_suite(
             "pyperformance_cinderx_static_loader_enable_patching": cinderx_feature_flags[
                 "static_loader_enable_patching"
             ],
+            "pyperformance_cinderx_jit_audit_required": _profile_expects_jit_compilation(
+                resolved_bootstrap_profile
+            ),
+            "pyperformance_cinderx_static_loader_required": _profile_expects_static_loader(
+                resolved_bootstrap_profile
+            ),
+            "pyperformance_cinderx_static_loader_fail_fast": _profile_expects_static_loader(
+                resolved_bootstrap_profile
+            ),
         },
         "toolchain": {
             "benchmark_repo_sha": repo_sha,
@@ -2670,10 +2908,25 @@ def run_pyperformance_suite(
         if ci_mode:
             command.extend(["--fast", "--benchmarks", ",".join(pyperformance_benchmarks or [])])
 
+        runtime_bootstrap_env: dict[str, str] | None = None
+        if pyperformance_bootstrap_env:
+            runtime_bootstrap_env = dict(pyperformance_bootstrap_env)
+            runtime_bootstrap_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
+
+        expect_post_run_jit_audit = (
+            target.key == "cpython-cinderx"
+            and _profile_expects_jit_compilation(resolved_bootstrap_profile)
+        )
+        jit_audit_tempdir: tempfile.TemporaryDirectory[str] | None = None
+        jit_audit_summary: dict[str, Any] | None = None
+        if expect_post_run_jit_audit:
+            jit_audit_tempdir = tempfile.TemporaryDirectory(prefix="cxc-pyperf-jit-audit-")
+            if runtime_bootstrap_env is None:
+                runtime_bootstrap_env = dict(os.environ)
+            runtime_bootstrap_env["CXC_PYPERF_JIT_AUDIT_DIR"] = jit_audit_tempdir.name
+
         try:
-            if pyperformance_bootstrap_env:
-                runtime_bootstrap_env = dict(pyperformance_bootstrap_env)
-                runtime_bootstrap_env["CXC_PYPERF_RUNTIME_KEY"] = target.key
+            if runtime_bootstrap_env is not None:
                 _run_command(
                     command,
                     timeout_s=1200 if ci_mode else 7200,
@@ -2683,6 +2936,23 @@ def run_pyperformance_suite(
                 _run_command(command, timeout_s=1200 if ci_mode else 7200)
             raw_payload = json.loads(raw_report_path.read_text(encoding="utf-8"))
             normalized_rows = _normalize_pyperformance_rows(raw_payload)
+            if expect_post_run_jit_audit and jit_audit_tempdir is not None:
+                jit_audit_summary = _collect_pyperformance_jit_audit(Path(jit_audit_tempdir.name))
+                if not bool(jit_audit_summary.get("jit_module_available_any")):
+                    raise ValueError(
+                        "post-run JIT audit did not detect cinderx.jit availability during "
+                        f"pyperformance execution: {jit_audit_summary}"
+                    )
+                if not bool(jit_audit_summary.get("jit_enabled_any")):
+                    raise ValueError(
+                        "post-run JIT audit did not detect jit_enabled=True during pyperformance "
+                        f"execution: {jit_audit_summary}"
+                    )
+                if not bool(jit_audit_summary.get("compiled_during_run")):
+                    raise ValueError(
+                        "post-run JIT audit did not detect compiled functions during "
+                        f"pyperformance execution: {jit_audit_summary}"
+                    )
         except (ValueError, OSError, json.JSONDecodeError) as exc:
             message = f"pyperformance execution failed ({exc})"
             if target.key == "cpython":
@@ -2706,6 +2976,9 @@ def run_pyperformance_suite(
             runtime_case_means.pop(target.key, None)
             runtime_case_samples.pop(target.key, None)
             continue
+        finally:
+            if jit_audit_tempdir is not None:
+                jit_audit_tempdir.cleanup()
 
         if not normalized_rows:
             message = "pyperformance run completed but no benchmark rows were parsed"
@@ -2785,6 +3058,7 @@ def run_pyperformance_suite(
             "startup_samples_seconds": startup_values,
             "startup_mean_seconds": startup_mean,
             "startup_stdev_seconds": startup_stdev,
+            "jit_audit": jit_audit_summary,
             "benchmarks": case_rows,
         }
         _safe_json(runtime_report_path, runtime_payload)
@@ -2799,6 +3073,7 @@ def run_pyperformance_suite(
                 "runtime_details": runtime_details,
                 "startup_mean_seconds": startup_mean,
                 "startup_stdev_seconds": startup_stdev,
+                "jit_audit": jit_audit_summary,
                 "executed": True,
             }
         )
@@ -2878,6 +3153,16 @@ def run_pyperformance_suite(
         "Normalized summary JSON written under data/summary/...",
         "Summary includes startup/runtime split, speedup vs baseline, and p-value estimates.",
     ]
+    if _profile_expects_jit_compilation(resolved_bootstrap_profile):
+        notes.append(
+            "Post-run JIT audit was enforced for cpython-cinderx runtime and must detect "
+            "compiled functions."
+        )
+    if _profile_expects_static_loader(resolved_bootstrap_profile):
+        notes.append(
+            "Selected profile requires strict loader stubs; missing stubs now fail fast "
+            "(no silent static-loader downgrade)."
+        )
     if baseline_runtime != "cpython-cinderx":
         notes.append(
             "CinderX baseline was not available in this run; fallback baseline runtime was used."

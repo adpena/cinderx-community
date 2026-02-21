@@ -9,7 +9,7 @@ This page is the source-backed reference for CinderX JIT controls and how this r
 ## Benchmark default in this repo
 
 For pyperformance runs with `--cpython-cinderx`, our default bootstrap profile is
-`cinderx-all-features`, and that profile now configures eager JIT (`jit-all` behavior) by calling:
+`cinderx-jit-all`, which configures eager JIT (`jit-all` behavior) by calling:
 
 ```python
 cinderx.jit.compile_after_n_calls(0)
@@ -21,13 +21,22 @@ hide JIT impact.
 ## Harness bootstrap profiles
 
 - `cinderx-init`: import + initialize CinderX only.
-- `cinderx-all-features`: JIT all + static loader install (`enable_patching=True` when stubs exist).
+- `cinderx-all-features`: JIT all + static loader install (`enable_patching=True`; strict stubs required and fail-fast).
 - `cinderx-jit-all`: JIT all only.
 - `cinderx-jit-auto`: default auto threshold.
 - `cinderx-jit-compile-after-n-calls`: configurable threshold.
 - `cinderx-jit-disable`: disable JIT.
-- `cinderx-static-loader`: strict/static loader only.
-- `cinderx-static-loader-patching`: strict/static loader with patching enabled.
+- `cinderx-static-loader`: strict/static loader only (strict stubs required and fail-fast).
+- `cinderx-static-loader-patching`: strict/static loader with patching enabled (strict stubs required and fail-fast).
+
+## Static Python scope boundary
+
+Bootstrap can install strict/static loader and JIT settings, but it cannot convert existing modules
+into Static Python automatically.
+
+Static behavior still requires module-level source markers (`import __static__`) at the top of the
+target module and strict-loader compilation/import path. This is why pyperformance publication runs
+in this repo are interpreter/JIT comparisons by default, not automatic static conversion.
 
 ## Python API knobs
 
@@ -115,8 +124,11 @@ As of the pinned upstream revision, JIT flags are registered in
 For reproducible CinderX-vs-CPython comparisons in this repo:
 
 1. Keep plain `cpython` lane unmodified.
-2. Keep `cpython-cinderx` lane on eager JIT (`cinderx-all-features` or `cinderx-jit-all`).
-3. Run preflight before full pyperformance to prove JIT compilation is actually occurring.
+2. Keep `cpython-cinderx` lane on eager JIT (`cinderx-jit-all` default publish path).
+3. Use `cinderx-all-features` only when you intentionally want strict/static loader behavior and
+   strict stubs are available.
+4. Run preflight before full pyperformance and require post-run JIT audit metadata to prove JIT
+   compilation occurred during the actual benchmark run.
 
 ## Sources
 

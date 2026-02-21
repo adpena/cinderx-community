@@ -171,5 +171,5 @@ elif [[ -n "$pyperf_bootstrap_profiles_csv" ]]; then
 elif [[ -n "$pyperf_bootstrap_inline" ]]; then
   echo "Pyperformance bootstrap mode: custom inline"
 elif [[ -n "$cinderx_python" ]]; then
-  echo "Pyperformance bootstrap profile: auto-default (cinderx-all-features = JIT all + static loader on cpython-cinderx lane only)"
+  echo "Pyperformance bootstrap profile: auto-default (cinderx-jit-all = JIT all on cpython-cinderx lane only)"
 fi

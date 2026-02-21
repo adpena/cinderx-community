@@ -118,7 +118,8 @@ CI mitigation in this repo:
 - `scripts/ci/install_and_probe_cinderx.sh --require-static-loader` now resolves a strict stubs
   path (site-packages first, upstream sparse checkout fallback) and runs a fast strict/static probe.
 - Bench preflight/run steps set `PYTHONSTRICTMODULESTUBSPATH` from the installer output, so
-  `cinderx-all-features` can install strict loader on Linux when wheel stubs are absent.
+  static-loader profiles can install strict loader on Linux when wheel stubs are absent.
+- Static-loader bootstrap profiles now fail fast on missing stubs (no silent downgrade).
 
 ## Publishability guardrail
 
@@ -130,9 +131,9 @@ CI mitigation in this repo:
 
 If those are not present, publication is rejected to prevent CPython-framed headline comparisons.
 
-Pyperformance with `--cpython-cinderx` auto-applies profile `cinderx-all-features` on the
-`cpython-cinderx` lane (plain `cpython` remains control). In this repo that profile means
-`JIT all` + static loader. For explicit profile overrides:
+Pyperformance with `--cpython-cinderx` auto-applies profile `cinderx-jit-all` on the
+`cpython-cinderx` lane (plain `cpython` remains control).
+For explicit profile overrides:
 
 ```bash
 CINDERX_PYTHON=/path/to/cinderx-python \
@@ -140,3 +141,6 @@ PYPERF_BOOTSTRAP_PROFILES=cinderx-jit-all,cinderx-jit-auto,cinderx-jit-compile-a
 PYPERF_BOOTSTRAP_JIT_COMPILE_AFTER_N_CALLS=40000 \
 bash scripts/bench/run_quickstart_matrix.sh
 ```
+
+If you select `cinderx-all-features` or `cinderx-static-loader*`, strict stubs are required and
+missing stubs now hard-fail the run with a clear error.
