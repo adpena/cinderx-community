@@ -13,6 +13,8 @@ on:
         default: true
         type: boolean
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -20,8 +22,30 @@ permissions:
   contents: write
 
 jobs:
+  release_gate:
+    name: Release Trigger Gate
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.gate.outputs.should_release }}
+
+    steps:
+      - name: Decide release execution
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" || "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Release workflow running in release mode."
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Non-release push detected; skipping artifact/release jobs."
+          fi
+
   build_python:
     name: Build Python Package
+    needs: release_gate
+    if: ${{ needs.release_gate.outputs.should_release == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -47,6 +71,8 @@ jobs:
 
   build_site:
     name: Build Site Bundle
+    needs: release_gate
+    if: ${{ needs.release_gate.outputs.should_release == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -88,8 +114,10 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs:
+      - release_gate
       - build_python
       - build_site
+    if: ${{ needs.release_gate.outputs.should_release == 'true' }}
 
     steps:
       - name: Resolve release tag
