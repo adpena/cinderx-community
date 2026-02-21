@@ -1,6 +1,14 @@
 {
-  "updated_at_utc": "2026-02-21T06:26:34Z",
+  "updated_at_utc": "2026-02-21T18:53:59Z",
   "entries": [
+    {
+      "recorded_at_utc": "2026-02-21T18:53:59Z",
+      "run_id": "22259154585",
+      "sha": "ab2afd52d9820896c6df2801cc89eb998f1071c0",
+      "ref": "main",
+      "run_summary_dir": "history/runs/20260221T185359Z-run22259154585/summary",
+      "latest_pyperformance_path": "history/latest/latest-pyperformance.json"
+    },
     {
       "recorded_at_utc": "2026-02-21T06:26:34Z",
       "run_id": "22249013369",
