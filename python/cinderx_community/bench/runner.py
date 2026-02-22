@@ -14,6 +14,8 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
+import time
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -45,6 +47,9 @@ PYPERFORMANCE_BOOTSTRAP_PROFILES = [
 DEFAULT_PYPERFORMANCE_JIT_COMPILE_AFTER_N_CALLS = 40000
 AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE = "cinderx-jit-all"
 SETUPTOOLS_DISTUTILS_LOCAL_MODE = "local"
+DEFAULT_PYPERFORMANCE_CI_TIMEOUT_SECONDS = 1200
+DEFAULT_PYPERFORMANCE_FULL_TIMEOUT_SECONDS = 14400
+COMMAND_OUTPUT_TAIL_MAX_LINES = 40
 PYPERFORMANCE_LEGACY_DISTUTILS_BENCHMARKS = "django_template,sympy"
 PYPERFORMANCE_INHERITED_ENV_VARS = (
     "PYTHONPATH",
@@ -1002,8 +1007,122 @@ def _validate_publish_suite_coherence(
 
 
 def _run_command(
-    args: list[str], *, timeout_s: int = 90, env: dict[str, str] | None = None
+    args: list[str],
+    *,
+    timeout_s: int = 90,
+    env: dict[str, str] | None = None,
+    stream_output: bool = False,
 ) -> subprocess.CompletedProcess[str]:
+    def _coerce_command_output(value: str | bytes | None) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, bytes):
+            return value.decode(errors="replace")
+        return value
+
+    def _tail_text(value: str | bytes | None) -> str:
+        text_value = _coerce_command_output(value)
+        if not text_value:
+            return "(no output)"
+        lines = [line.rstrip() for line in text_value.splitlines() if line.strip()]
+        if not lines:
+            return "(no output)"
+        return "\n".join(lines[-COMMAND_OUTPUT_TAIL_MAX_LINES:])
+
+    def _format_failure(
+        *,
+        reason: str,
+        stdout: str | bytes | None,
+        stderr: str | bytes | None,
+    ) -> str:
+        return "\n".join(
+            [
+                f"{reason}: {' '.join(args)}",
+                "stdout tail:",
+                _tail_text(stdout),
+                "stderr tail:",
+                _tail_text(stderr),
+            ]
+        )
+
+    if stream_output:
+        try:
+            process = subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+            )
+        except FileNotFoundError as exc:
+            raise ValueError(f"Executable not found: {args[0]}") from exc
+
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+
+        def _stream_reader(
+            stream: Any,
+            sink: Any,
+            chunks: list[str],
+        ) -> None:
+            if stream is None:
+                return
+            for line in iter(stream.readline, ""):
+                chunks.append(line)
+                sink.write(line)
+                sink.flush()
+            stream.close()
+
+        stdout_thread = threading.Thread(
+            target=_stream_reader,
+            args=(process.stdout, sys.stdout, stdout_chunks),
+            daemon=True,
+        )
+        stderr_thread = threading.Thread(
+            target=_stream_reader,
+            args=(process.stderr, sys.stderr, stderr_chunks),
+            daemon=True,
+        )
+        stdout_thread.start()
+        stderr_thread.start()
+
+        started = time.monotonic()
+        try:
+            return_code = process.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired as exc:
+            process.kill()
+            process.wait()
+            stdout_thread.join(timeout=5)
+            stderr_thread.join(timeout=5)
+            elapsed_s = int(time.monotonic() - started)
+            raise ValueError(
+                _format_failure(
+                    reason=f"Command timed out after {timeout_s}s (elapsed={elapsed_s}s)",
+                    stdout="".join(stdout_chunks),
+                    stderr="".join(stderr_chunks),
+                )
+            ) from exc
+
+        stdout_thread.join(timeout=5)
+        stderr_thread.join(timeout=5)
+        stdout_value = "".join(stdout_chunks)
+        stderr_value = "".join(stderr_chunks)
+        if return_code != 0:
+            raise ValueError(
+                _format_failure(
+                    reason=f"Command failed with exit code {return_code}",
+                    stdout=stdout_value,
+                    stderr=stderr_value,
+                )
+            )
+
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=return_code,
+            stdout=stdout_value,
+            stderr=stderr_value,
+        )
+
     try:
         return subprocess.run(
             args,
@@ -1015,9 +1134,22 @@ def _run_command(
         )
     except FileNotFoundError as exc:
         raise ValueError(f"Executable not found: {args[0]}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError(
+            _format_failure(
+                reason=f"Command timed out after {timeout_s}s",
+                stdout=exc.stdout,
+                stderr=exc.stderr,
+            )
+        ) from exc
     except subprocess.CalledProcessError as exc:
-        stderr = exc.stderr.strip() or "(no stderr)"
-        raise ValueError(f"Command failed: {' '.join(args)}\n{stderr}") from exc
+        raise ValueError(
+            _format_failure(
+                reason=f"Command failed with exit code {exc.returncode}",
+                stdout=exc.stdout,
+                stderr=exc.stderr,
+            )
+        ) from exc
 
 
 def _pyperformance_inherit_environ_value(env: dict[str, str] | None) -> str | None:
@@ -3062,6 +3194,7 @@ def run_pyperformance_suite(
     pyperformance_bootstrap_inline: str | None = None,
     pyperformance_bootstrap_profile: str | None = None,
     pyperformance_bootstrap_jit_compile_after_n_calls: int | None = None,
+    pyperformance_runtime_timeout_seconds: int | None = None,
 ) -> BenchmarkRunResult:
     python_hint = Path(os.path.abspath(str(python.expanduser())))
     baseline_python = Path(os.path.abspath(str(python_hint)))
@@ -3076,6 +3209,16 @@ def run_pyperformance_suite(
     machine_slug = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in machine_name)
     startup_samples = 3 if ci_mode else 5
     pyperformance_benchmarks = ["nbody"] if ci_mode else None
+    runtime_timeout_seconds = pyperformance_runtime_timeout_seconds
+    if runtime_timeout_seconds is None:
+        runtime_timeout_seconds = (
+            DEFAULT_PYPERFORMANCE_CI_TIMEOUT_SECONDS
+            if ci_mode
+            else DEFAULT_PYPERFORMANCE_FULL_TIMEOUT_SECONDS
+        )
+    if runtime_timeout_seconds <= 0:
+        raise ValueError("pyperformance runtime timeout must be a positive integer in seconds.")
+    stream_pyperformance_output = bool(os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"))
 
     guardrails = _guardrail_checks(ci_mode)
     if enforce_guardrails and guardrails["enforceable_failures"]:
@@ -3134,6 +3277,8 @@ def run_pyperformance_suite(
             "startup_samples": startup_samples,
             "pyperformance_mode": "fast" if ci_mode else "default",
             "pyperformance_benchmarks": pyperformance_benchmarks,
+            "pyperformance_runtime_timeout_seconds": runtime_timeout_seconds,
+            "pyperformance_stream_output": stream_pyperformance_output,
             "require_cinderx_baseline": require_cinderx_baseline,
             "pyperformance_bootstrap_inline_enabled": bool(pyperformance_bootstrap_sha256),
             "pyperformance_bootstrap_inline_sha256": pyperformance_bootstrap_sha256,
@@ -3274,14 +3419,28 @@ def run_pyperformance_suite(
         command = _with_pyperformance_inherit_environ(command, env=runtime_bootstrap_env)
 
         try:
+            if stream_pyperformance_output:
+                print(
+                    (
+                        f"[cxc bench] Running pyperformance runtime {target.key} with timeout "
+                        f"{runtime_timeout_seconds}s"
+                    ),
+                    file=sys.stderr,
+                    flush=True,
+                )
             if runtime_bootstrap_env is not None:
                 _run_command(
                     command,
-                    timeout_s=1200 if ci_mode else 7200,
+                    timeout_s=runtime_timeout_seconds,
                     env=runtime_bootstrap_env,
+                    stream_output=stream_pyperformance_output,
                 )
             else:
-                _run_command(command, timeout_s=1200 if ci_mode else 7200)
+                _run_command(
+                    command,
+                    timeout_s=runtime_timeout_seconds,
+                    stream_output=stream_pyperformance_output,
+                )
             raw_payload = json.loads(raw_report_path.read_text(encoding="utf-8"))
             normalized_rows = _normalize_pyperformance_rows(raw_payload)
             if expect_post_run_jit_audit and jit_audit_tempdir is not None:

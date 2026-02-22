@@ -239,6 +239,16 @@ def bench_run(
             ),
         ),
     ] = None,
+    pyperformance_runtime_timeout_seconds: Annotated[
+        int | None,
+        typer.Option(
+            min=1,
+            help=(
+                "Command timeout in seconds for each pyperformance runtime invocation. "
+                "Defaults to 1200 in --ci-mode and 14400 otherwise."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Run benchmark suites or print execution plans for not-yet-automated suites."""
     runnable_suites = {SMOKE_SUITE, PYPERFORMANCE_SUITE}
@@ -282,6 +292,7 @@ def bench_run(
                 pyperformance_bootstrap_jit_compile_after_n_calls=(
                     pyperformance_bootstrap_jit_compile_after_n_calls
                 ),
+                pyperformance_runtime_timeout_seconds=pyperformance_runtime_timeout_seconds,
             )
     except ValueError as exc:
         typer.echo(str(exc), err=True)

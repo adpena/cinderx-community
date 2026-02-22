@@ -109,6 +109,20 @@ def test_build_plan_for_planned_suite_uses_planning_mode() -> None:
     assert "Planning mode" in plan.notes
 
 
+def test_run_command_timeout_surfaces_output_tail() -> None:
+    script = "import time; print('before-timeout', flush=True); time.sleep(2)"
+
+    try:
+        runner._run_command([sys.executable, "-c", script], timeout_s=1)
+    except ValueError as exc:
+        message = str(exc)
+        assert "Command timed out after 1s" in message
+        assert "stdout tail:" in message
+        assert "before-timeout" in message
+    else:
+        raise AssertionError("Expected timeout diagnostics from _run_command")
+
+
 def test_run_smoke_suite_writes_summary_and_indexes(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(upstream, "PINS_FILE", tmp_path / "pins.toml")
 
@@ -300,8 +314,11 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
         *,
         timeout_s: int = 90,
         env: dict[str, str] | None = None,
+        stream_output: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         if args and args[0] == "fake-pyperformance":
+            assert timeout_s == 42
+            assert stream_output is False
             if env:
                 runtime_key = env.get("CXC_PYPERF_RUNTIME_KEY", "unknown")
                 observed_env_by_runtime_key[runtime_key] = dict(env)
@@ -350,7 +367,12 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
             }
             output_arg.write_text(json.dumps(payload), encoding="utf-8")
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
-        return original_run_command(args, timeout_s=timeout_s, env=env)
+        return original_run_command(
+            args,
+            timeout_s=timeout_s,
+            env=env,
+            stream_output=stream_output,
+        )
 
     monkeypatch.setattr(runner, "_run_command", fake_run_command)
 
@@ -363,6 +385,7 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
         machine="pyperformance-test",
         ci_mode=True,
         require_cinderx_baseline=True,
+        pyperformance_runtime_timeout_seconds=42,
     )
 
     summary = json.loads(Path(result.summary_path).read_text(encoding="utf-8"))
@@ -377,6 +400,7 @@ def test_run_pyperformance_suite_normalizes_results(tmp_path: Path, monkeypatch)
     assert run_config["pyperformance_bootstrap_target_runtime_key"] == "cpython-cinderx"
     assert run_config["pyperformance_cinderx_jit_audit_required"] is True
     assert run_config["pyperformance_cinderx_static_loader_required"] is False
+    assert run_config["pyperformance_runtime_timeout_seconds"] == 42
     assert observed_env_by_runtime_key["cpython"]["CXC_PYPERF_BOOTSTRAP_TARGET_RUNTIME_KEY"] == (
         "cpython-cinderx"
     )
@@ -636,6 +660,7 @@ def test_run_pyperformance_suite_records_bootstrap_profile_metadata(
         *,
         timeout_s: int = 90,
         env: dict[str, str] | None = None,
+        stream_output: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         if args and args[0] == "fake-pyperformance":
             if env:
@@ -669,7 +694,12 @@ def test_run_pyperformance_suite_records_bootstrap_profile_metadata(
             }
             output_arg.write_text(json.dumps(payload), encoding="utf-8")
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
-        return original_run_command(args, timeout_s=timeout_s, env=env)
+        return original_run_command(
+            args,
+            timeout_s=timeout_s,
+            env=env,
+            stream_output=stream_output,
+        )
 
     monkeypatch.setattr(runner, "_run_command", fake_run_command)
 
@@ -742,6 +772,7 @@ def test_preflight_pyperformance_uses_cinderx_runtime_with_auto_profile(
         *,
         timeout_s: int = 90,
         env: dict[str, str] | None = None,
+        stream_output: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         if len(args) >= 3 and args[1] == "-m" and args[2] == "pyperformance":
             observed_commands.append(list(args))
@@ -779,7 +810,12 @@ def test_preflight_pyperformance_uses_cinderx_runtime_with_auto_profile(
                 stdout=json.dumps(payload),
                 stderr="",
             )
-        return original_run_command(args, timeout_s=timeout_s, env=env)
+        return original_run_command(
+            args,
+            timeout_s=timeout_s,
+            env=env,
+            stream_output=stream_output,
+        )
 
     monkeypatch.setattr(runner, "_run_command", fake_run_command)
 
@@ -830,6 +866,7 @@ def test_preflight_pyperformance_fails_fast_on_launcher_error(tmp_path: Path, mo
         *,
         timeout_s: int = 90,
         env: dict[str, str] | None = None,
+        stream_output: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         if len(args) >= 3 and args[1] == "-m" and args[2] == "pyperformance":
             raise ValueError("simulated pyperformance bootstrap break")
@@ -882,6 +919,7 @@ def test_run_pyperformance_suite_without_cinderx_keeps_bootstrap_disabled(
         *,
         timeout_s: int = 90,
         env: dict[str, str] | None = None,
+        stream_output: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         if args and args[0] == "fake-pyperformance":
             if env:
@@ -897,7 +935,12 @@ def test_run_pyperformance_suite_without_cinderx_keeps_bootstrap_disabled(
             }
             output_arg.write_text(json.dumps(payload), encoding="utf-8")
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
-        return original_run_command(args, timeout_s=timeout_s, env=env)
+        return original_run_command(
+            args,
+            timeout_s=timeout_s,
+            env=env,
+            stream_output=stream_output,
+        )
 
     monkeypatch.setattr(runner, "_run_command", fake_run_command)
 
