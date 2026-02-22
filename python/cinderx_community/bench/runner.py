@@ -3255,6 +3255,7 @@ def run_pyperformance_suite(
     pyperformance_bootstrap_profile: str | None = None,
     pyperformance_bootstrap_jit_compile_after_n_calls: int | None = None,
     pyperformance_runtime_timeout_seconds: int | None = None,
+    pyperformance_benchmark_timeout_seconds: int | None = None,
     pyperformance_resume_incomplete: bool = False,
     pyperformance_resume_batch_size: int = DEFAULT_PYPERFORMANCE_RESUME_BATCH_SIZE,
 ) -> BenchmarkRunResult:
@@ -3280,6 +3281,11 @@ def run_pyperformance_suite(
         )
     if runtime_timeout_seconds <= 0:
         raise ValueError("pyperformance runtime timeout must be a positive integer in seconds.")
+    if (
+        pyperformance_benchmark_timeout_seconds is not None
+        and pyperformance_benchmark_timeout_seconds <= 0
+    ):
+        raise ValueError("pyperformance benchmark timeout must be a positive integer in seconds.")
     if pyperformance_resume_incomplete and pyperformance_resume_batch_size <= 0:
         raise ValueError("pyperformance resume batch size must be a positive integer.")
     stream_pyperformance_output = bool(os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"))
@@ -3342,6 +3348,7 @@ def run_pyperformance_suite(
             "pyperformance_mode": "fast" if ci_mode else "default",
             "pyperformance_benchmarks": pyperformance_benchmarks,
             "pyperformance_runtime_timeout_seconds": runtime_timeout_seconds,
+            "pyperformance_benchmark_timeout_seconds": pyperformance_benchmark_timeout_seconds,
             "pyperformance_stream_output": stream_pyperformance_output,
             "pyperformance_resume_incomplete": pyperformance_resume_incomplete,
             "pyperformance_resume_batch_size": pyperformance_resume_batch_size,
@@ -3557,6 +3564,10 @@ def run_pyperformance_suite(
                     ]
                     if ci_mode:
                         batch_command.append("--fast")
+                    if pyperformance_benchmark_timeout_seconds is not None:
+                        batch_command.extend(
+                            ["--timeout", str(pyperformance_benchmark_timeout_seconds)]
+                        )
                     try:
                         _execute_pyperformance_command(batch_command)
                         continue
@@ -3576,6 +3587,8 @@ def run_pyperformance_suite(
                     ]
                     if not unresolved_batch:
                         continue
+                    if len(batch) == 1 and unresolved_batch == batch:
+                        continue
 
                     for benchmark_name in unresolved_batch:
                         single_command = [
@@ -3590,6 +3603,10 @@ def run_pyperformance_suite(
                         ]
                         if ci_mode:
                             single_command.append("--fast")
+                        if pyperformance_benchmark_timeout_seconds is not None:
+                            single_command.extend(
+                                ["--timeout", str(pyperformance_benchmark_timeout_seconds)]
+                            )
                         try:
                             _execute_pyperformance_command(single_command)
                         except (ValueError, OSError, json.JSONDecodeError) as benchmark_exc:
@@ -3626,6 +3643,8 @@ def run_pyperformance_suite(
                     command.extend(
                         ["--fast", "--benchmarks", ",".join(pyperformance_benchmarks or [])]
                     )
+                if pyperformance_benchmark_timeout_seconds is not None:
+                    command.extend(["--timeout", str(pyperformance_benchmark_timeout_seconds)])
                 _execute_pyperformance_command(command)
                 raw_payload = _load_pyperformance_raw_payload(raw_report_path)
 

@@ -616,6 +616,177 @@ def test_run_pyperformance_suite_resume_mode_recovers_from_batch_failure(
     assert cpython_runtime_report["pyperformance_resume_failures"]
 
 
+def test_run_pyperformance_suite_resume_batch_size_one_does_not_duplicate_failure_retries(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(upstream, "PINS_FILE", tmp_path / "pins.toml")
+
+    cpython_link = tmp_path / "cpython-runtime"
+    cpython_link.symlink_to(Path(sys.executable))
+
+    monkeypatch.setattr(
+        runner,
+        "_resolve_pyperformance_launcher",
+        lambda _python_hint: (["fake-pyperformance"], "v1"),
+    )
+    monkeypatch.setattr(runner, "_measure_startup", lambda _executable, samples: [0.01] * samples)
+    monkeypatch.setattr(
+        runner,
+        "_python_runtime_details",
+        lambda _executable: {"implementation": "CPython", "version": "3.14"},
+    )
+    monkeypatch.setattr(runner, "_version_line", lambda _executable: "Python 3.14")
+
+    observed_run_benchmark_args: list[str] = []
+    completed: dict[str, float] = {}
+
+    def write_checkpoint(path: Path) -> None:
+        payload = {
+            "benchmarks": [
+                {
+                    "metadata": {"name": benchmark_name},
+                    "runs": [{"values": [mean, mean + 0.01], "warmups": [mean + 0.02]}],
+                }
+                for benchmark_name, mean in sorted(completed.items())
+            ]
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+    original_run_command = runner._run_command
+
+    def fake_run_command(
+        args: list[str],
+        *,
+        timeout_s: int = 90,
+        env: dict[str, str] | None = None,
+        stream_output: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        if not args or args[0] != "fake-pyperformance":
+            return original_run_command(
+                args,
+                timeout_s=timeout_s,
+                env=env,
+                stream_output=stream_output,
+            )
+
+        if len(args) >= 2 and args[1] == "list":
+            stdout = "\n".join(
+                [
+                    "'<default>' benchmarks:",
+                    "- bench_a",
+                    "- bench_b",
+                    "- bench_c",
+                    "Total: 3 benchmarks",
+                ]
+            )
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
+
+        if len(args) >= 2 and args[1] == "run":
+            append_arg = Path(args[args.index("--append") + 1])
+            benchmarks_arg = args[args.index("--benchmarks") + 1]
+            observed_run_benchmark_args.append(benchmarks_arg)
+            if benchmarks_arg == "bench_a":
+                raise ValueError("simulated single-benchmark timeout")
+            for benchmark_name in benchmarks_arg.split(","):
+                benchmark_name = benchmark_name.strip()
+                if not benchmark_name:
+                    continue
+                completed[benchmark_name] = {
+                    "bench_b": 0.12,
+                    "bench_c": 0.13,
+                }[benchmark_name]
+            write_checkpoint(append_arg)
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+
+        raise AssertionError(f"Unexpected fake pyperformance command: {args}")
+
+    monkeypatch.setattr(runner, "_run_command", fake_run_command)
+
+    result = runner.run_pyperformance_suite(
+        python=cpython_link,
+        out_root=tmp_path / "runs",
+        summary_root=tmp_path / "summary",
+        machine="pyperformance-resume-batch-size-one",
+        ci_mode=False,
+        pyperformance_runtime_timeout_seconds=42,
+        pyperformance_resume_incomplete=True,
+        pyperformance_resume_batch_size=1,
+    )
+
+    summary = json.loads(Path(result.summary_path).read_text(encoding="utf-8"))
+    cpython_rows = [row for row in summary["benchmarks"] if row["runtime"] == "cpython"]
+    assert {row["benchmark"] for row in cpython_rows} == {"bench_b", "bench_c"}
+    assert observed_run_benchmark_args == ["bench_a", "bench_b", "bench_c"]
+
+
+def test_run_pyperformance_suite_applies_benchmark_timeout_option(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(upstream, "PINS_FILE", tmp_path / "pins.toml")
+
+    cpython_link = tmp_path / "cpython-runtime"
+    cpython_link.symlink_to(Path(sys.executable))
+
+    monkeypatch.setattr(
+        runner,
+        "_resolve_pyperformance_launcher",
+        lambda _python_hint: (["fake-pyperformance"], "v1"),
+    )
+    monkeypatch.setattr(runner, "_measure_startup", lambda _executable, samples: [0.01] * samples)
+    monkeypatch.setattr(
+        runner,
+        "_python_runtime_details",
+        lambda _executable: {"implementation": "CPython", "version": "3.14"},
+    )
+    monkeypatch.setattr(runner, "_version_line", lambda _executable: "Python 3.14")
+
+    observed_run_args: list[list[str]] = []
+    original_run_command = runner._run_command
+
+    def fake_run_command(
+        args: list[str],
+        *,
+        timeout_s: int = 90,
+        env: dict[str, str] | None = None,
+        stream_output: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        if args and args[0] == "fake-pyperformance" and len(args) >= 2 and args[1] == "run":
+            observed_run_args.append(list(args))
+            output_arg = Path(args[args.index("--output") + 1])
+            payload = {
+                "benchmarks": [
+                    {
+                        "metadata": {"name": "nbody"},
+                        "runs": [{"values": [0.30, 0.32], "warmups": [0.35]}],
+                    }
+                ]
+            }
+            output_arg.write_text(json.dumps(payload), encoding="utf-8")
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+        return original_run_command(
+            args,
+            timeout_s=timeout_s,
+            env=env,
+            stream_output=stream_output,
+        )
+
+    monkeypatch.setattr(runner, "_run_command", fake_run_command)
+
+    runner.run_pyperformance_suite(
+        python=cpython_link,
+        out_root=tmp_path / "runs",
+        summary_root=tmp_path / "summary",
+        machine="pyperformance-benchmark-timeout-option",
+        ci_mode=True,
+        pyperformance_benchmark_timeout_seconds=77,
+    )
+
+    assert observed_run_args
+    assert "--timeout" in observed_run_args[0]
+    assert observed_run_args[0][observed_run_args[0].index("--timeout") + 1] == "77"
+
+
 def test_resolve_pyperformance_bootstrap_profile_compile_after_defaults() -> None:
     inline_code, profile, threshold, source_mode = runner._resolve_pyperformance_bootstrap_inline(
         inline_code=None,

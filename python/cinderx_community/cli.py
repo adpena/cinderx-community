@@ -249,6 +249,16 @@ def bench_run(
             ),
         ),
     ] = None,
+    pyperformance_benchmark_timeout_seconds: Annotated[
+        int | None,
+        typer.Option(
+            min=1,
+            help=(
+                "Maximum seconds for a single benchmark run inside pyperformance "
+                "(passed through as --timeout)."
+            ),
+        ),
+    ] = None,
     pyperformance_resume_incomplete: Annotated[
         bool,
         typer.Option(
@@ -312,6 +322,7 @@ def bench_run(
                     pyperformance_bootstrap_jit_compile_after_n_calls
                 ),
                 pyperformance_runtime_timeout_seconds=pyperformance_runtime_timeout_seconds,
+                pyperformance_benchmark_timeout_seconds=pyperformance_benchmark_timeout_seconds,
                 pyperformance_resume_incomplete=pyperformance_resume_incomplete,
                 pyperformance_resume_batch_size=pyperformance_resume_batch_size,
             )

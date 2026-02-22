@@ -208,9 +208,10 @@ jobs:
             --cpython-cinderx "${{ steps.cinderx_strict.outputs.cinderx_bin }}" \
             --require-cinderx-baseline \
             --pyperformance-bootstrap-profile cinderx-jit-all \
-            --pyperformance-runtime-timeout-seconds 14400 \
+            --pyperformance-runtime-timeout-seconds 1800 \
+            --pyperformance-benchmark-timeout-seconds 600 \
             --pyperformance-resume-incomplete \
-            --pyperformance-resume-batch-size 12 \
+            --pyperformance-resume-batch-size 1 \
             --out data/runs \
             --summary-out data/summary \
             --static-summary-out packages/site/static/data/summary
