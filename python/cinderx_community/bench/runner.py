@@ -49,6 +49,7 @@ AUTO_PYPERFORMANCE_BOOTSTRAP_PROFILE = "cinderx-jit-all"
 SETUPTOOLS_DISTUTILS_LOCAL_MODE = "local"
 DEFAULT_PYPERFORMANCE_CI_TIMEOUT_SECONDS = 1200
 DEFAULT_PYPERFORMANCE_FULL_TIMEOUT_SECONDS = 14400
+DEFAULT_PYPERFORMANCE_RESUME_BATCH_SIZE = 12
 COMMAND_OUTPUT_TAIL_MAX_LINES = 40
 PYPERFORMANCE_LEGACY_DISTUTILS_BENCHMARKS = "django_template,sympy"
 PYPERFORMANCE_INHERITED_ENV_VARS = (
@@ -3021,6 +3022,65 @@ def _resolve_pyperformance_launcher(python_hint: Path) -> tuple[list[str], str]:
     )
 
 
+def _parse_pyperformance_list_output(output: str) -> list[str]:
+    names: list[str] = []
+    seen: set[str] = set()
+    for line in output.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("- "):
+            continue
+        candidate = stripped[2:].strip()
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        names.append(candidate)
+    return names
+
+
+def _list_pyperformance_benchmarks(
+    *,
+    pyperformance_command: list[str],
+    executable: Path,
+    env: dict[str, str] | None,
+) -> list[str]:
+    command = [*pyperformance_command, "list", "--python", str(executable)]
+    command = _with_pyperformance_inherit_environ(command, env=env)
+    completed = _run_command(command, timeout_s=120, env=env)
+    names = _parse_pyperformance_list_output(completed.stdout)
+    if names:
+        return names
+    raise ValueError("Unable to resolve benchmark list from `pyperformance list` output.")
+
+
+def _pyperformance_payload_benchmark_names(raw_payload: dict[str, Any]) -> list[str]:
+    rows = raw_payload.get("benchmarks")
+    if not isinstance(rows, list):
+        return []
+    names: list[str] = []
+    seen: set[str] = set()
+    for entry in rows:
+        if not isinstance(entry, dict):
+            continue
+        name = _benchmark_name_from_payload(entry)
+        if not name or name == "unknown-benchmark" or name in seen:
+            continue
+        seen.add(name)
+        names.append(name)
+    return names
+
+
+def _load_pyperformance_raw_payload(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _chunk_pyperformance_benchmarks(benchmarks: list[str], *, chunk_size: int) -> list[list[str]]:
+    if chunk_size <= 0:
+        raise ValueError("pyperformance resume batch size must be a positive integer.")
+    return [
+        benchmarks[index : index + chunk_size] for index in range(0, len(benchmarks), chunk_size)
+    ]
+
+
 def _benchmark_name_from_payload(entry: dict[str, Any]) -> str:
     name = entry.get("name")
     if isinstance(name, str) and name.strip():
@@ -3195,6 +3255,8 @@ def run_pyperformance_suite(
     pyperformance_bootstrap_profile: str | None = None,
     pyperformance_bootstrap_jit_compile_after_n_calls: int | None = None,
     pyperformance_runtime_timeout_seconds: int | None = None,
+    pyperformance_resume_incomplete: bool = False,
+    pyperformance_resume_batch_size: int = DEFAULT_PYPERFORMANCE_RESUME_BATCH_SIZE,
 ) -> BenchmarkRunResult:
     python_hint = Path(os.path.abspath(str(python.expanduser())))
     baseline_python = Path(os.path.abspath(str(python_hint)))
@@ -3218,6 +3280,8 @@ def run_pyperformance_suite(
         )
     if runtime_timeout_seconds <= 0:
         raise ValueError("pyperformance runtime timeout must be a positive integer in seconds.")
+    if pyperformance_resume_incomplete and pyperformance_resume_batch_size <= 0:
+        raise ValueError("pyperformance resume batch size must be a positive integer.")
     stream_pyperformance_output = bool(os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"))
 
     guardrails = _guardrail_checks(ci_mode)
@@ -3279,6 +3343,8 @@ def run_pyperformance_suite(
             "pyperformance_benchmarks": pyperformance_benchmarks,
             "pyperformance_runtime_timeout_seconds": runtime_timeout_seconds,
             "pyperformance_stream_output": stream_pyperformance_output,
+            "pyperformance_resume_incomplete": pyperformance_resume_incomplete,
+            "pyperformance_resume_batch_size": pyperformance_resume_batch_size,
             "require_cinderx_baseline": require_cinderx_baseline,
             "pyperformance_bootstrap_inline_enabled": bool(pyperformance_bootstrap_sha256),
             "pyperformance_bootstrap_inline_sha256": pyperformance_bootstrap_sha256,
@@ -3371,16 +3437,12 @@ def run_pyperformance_suite(
         runtime_case_samples[target.key] = {}
 
         raw_report_path = runtime_dir / f"{PYPERFORMANCE_SUITE}-raw-{run_id}.json"
-        command = [
-            *pyperformance_command,
-            "run",
-            "--python",
-            str(target.executable),
-            "--output",
-            str(raw_report_path),
-        ]
-        if ci_mode:
-            command.extend(["--fast", "--benchmarks", ",".join(pyperformance_benchmarks or [])])
+        command: list[str] = []
+        command_invocations: list[list[str]] = []
+        runtime_execution_failures: list[str] = []
+        target_benchmark_universe: list[str] | None = None
+        remaining_benchmarks: list[str] = []
+        resume_checkpoint_path: Path | None = None
 
         runtime_bootstrap_env: dict[str, str] | None = None
         if pyperformance_bootstrap_env:
@@ -3416,32 +3478,159 @@ def run_pyperformance_suite(
                 _ensure_setuptools_distutils_local_mode(runtime_bootstrap_env)
             runtime_bootstrap_env["CXC_PYPERF_JIT_AUDIT_DIR"] = jit_audit_tempdir.name
 
-        command = _with_pyperformance_inherit_environ(command, env=runtime_bootstrap_env)
-
-        try:
+        def _execute_pyperformance_command(
+            command_args: list[str],
+            *,
+            _runtime_bootstrap_env: dict[str, str] | None = runtime_bootstrap_env,
+            _target_key: str = target.key,
+            _command_invocations: list[list[str]] = command_invocations,
+        ) -> None:
+            command_with_inherit = _with_pyperformance_inherit_environ(
+                command_args,
+                env=_runtime_bootstrap_env,
+            )
+            _command_invocations.append(command_with_inherit)
             if stream_pyperformance_output:
                 print(
                     (
-                        f"[cxc bench] Running pyperformance runtime {target.key} with timeout "
-                        f"{runtime_timeout_seconds}s"
+                        f"[cxc bench] Running pyperformance runtime {_target_key} with timeout "
+                        f"{runtime_timeout_seconds}s: {' '.join(command_with_inherit)}"
                     ),
                     file=sys.stderr,
                     flush=True,
                 )
-            if runtime_bootstrap_env is not None:
+            if _runtime_bootstrap_env is not None:
                 _run_command(
-                    command,
+                    command_with_inherit,
                     timeout_s=runtime_timeout_seconds,
-                    env=runtime_bootstrap_env,
+                    env=_runtime_bootstrap_env,
                     stream_output=stream_pyperformance_output,
                 )
             else:
                 _run_command(
-                    command,
+                    command_with_inherit,
                     timeout_s=runtime_timeout_seconds,
                     stream_output=stream_pyperformance_output,
                 )
-            raw_payload = json.loads(raw_report_path.read_text(encoding="utf-8"))
+
+        def _completed_from_checkpoint(path: Path) -> set[str]:
+            if not path.exists():
+                return set()
+            payload = _load_pyperformance_raw_payload(path)
+            return set(_pyperformance_payload_benchmark_names(payload))
+
+        try:
+            raw_payload: dict[str, Any]
+            if pyperformance_resume_incomplete:
+                if ci_mode:
+                    target_benchmark_universe = list(pyperformance_benchmarks or [])
+                else:
+                    target_benchmark_universe = _list_pyperformance_benchmarks(
+                        pyperformance_command=pyperformance_command,
+                        executable=target.executable,
+                        env=runtime_bootstrap_env,
+                    )
+                target_benchmark_universe = list(dict.fromkeys(target_benchmark_universe))
+                resume_checkpoint_path = (
+                    runtime_dir / f"{PYPERFORMANCE_SUITE}-checkpoint-{target.key}.json"
+                )
+                completed_benchmarks = _completed_from_checkpoint(resume_checkpoint_path)
+                remaining_benchmarks = [
+                    name for name in target_benchmark_universe if name not in completed_benchmarks
+                ]
+                benchmark_batches = _chunk_pyperformance_benchmarks(
+                    remaining_benchmarks,
+                    chunk_size=pyperformance_resume_batch_size,
+                )
+                for batch in benchmark_batches:
+                    if not batch:
+                        continue
+                    batch_command = [
+                        *pyperformance_command,
+                        "run",
+                        "--python",
+                        str(target.executable),
+                        "--append",
+                        str(resume_checkpoint_path),
+                        "--benchmarks",
+                        ",".join(batch),
+                    ]
+                    if ci_mode:
+                        batch_command.append("--fast")
+                    try:
+                        _execute_pyperformance_command(batch_command)
+                        continue
+                    except (ValueError, OSError, json.JSONDecodeError) as exc:
+                        runtime_execution_failures.append(f"batch {','.join(batch)} failed ({exc})")
+
+                    try:
+                        completed_after_batch = _completed_from_checkpoint(resume_checkpoint_path)
+                    except (ValueError, OSError, json.JSONDecodeError) as checkpoint_exc:
+                        completed_after_batch = set()
+                        runtime_execution_failures.append(
+                            "failed to inspect pyperformance checkpoint after batch failure "
+                            f"({checkpoint_exc})"
+                        )
+                    unresolved_batch = [
+                        benchmark for benchmark in batch if benchmark not in completed_after_batch
+                    ]
+                    if not unresolved_batch:
+                        continue
+
+                    for benchmark_name in unresolved_batch:
+                        single_command = [
+                            *pyperformance_command,
+                            "run",
+                            "--python",
+                            str(target.executable),
+                            "--append",
+                            str(resume_checkpoint_path),
+                            "--benchmarks",
+                            benchmark_name,
+                        ]
+                        if ci_mode:
+                            single_command.append("--fast")
+                        try:
+                            _execute_pyperformance_command(single_command)
+                        except (ValueError, OSError, json.JSONDecodeError) as benchmark_exc:
+                            runtime_execution_failures.append(
+                                f"benchmark {benchmark_name} failed ({benchmark_exc})"
+                            )
+
+                if not resume_checkpoint_path.exists():
+                    raise ValueError(
+                        "pyperformance resume mode produced no checkpoint output file."
+                    )
+                raw_payload = _load_pyperformance_raw_payload(resume_checkpoint_path)
+                completed_benchmarks = _pyperformance_payload_benchmark_names(raw_payload)
+                completed_set = set(completed_benchmarks)
+                remaining_benchmarks = [
+                    name for name in (target_benchmark_universe or []) if name not in completed_set
+                ]
+                if remaining_benchmarks:
+                    runtime_execution_failures.append(
+                        "unresolved benchmarks remained after resume execution: "
+                        + ", ".join(remaining_benchmarks)
+                    )
+                shutil.copy2(resume_checkpoint_path, raw_report_path)
+            else:
+                command = [
+                    *pyperformance_command,
+                    "run",
+                    "--python",
+                    str(target.executable),
+                    "--output",
+                    str(raw_report_path),
+                ]
+                if ci_mode:
+                    command.extend(
+                        ["--fast", "--benchmarks", ",".join(pyperformance_benchmarks or [])]
+                    )
+                _execute_pyperformance_command(command)
+                raw_payload = _load_pyperformance_raw_payload(raw_report_path)
+
+            if not command and command_invocations:
+                command = command_invocations[-1]
             normalized_rows = _normalize_pyperformance_rows(raw_payload)
             if expect_post_run_jit_audit and jit_audit_tempdir is not None:
                 jit_audit_summary = _collect_pyperformance_jit_audit(Path(jit_audit_tempdir.name))
@@ -3511,12 +3700,6 @@ def run_pyperformance_suite(
                         )
         except (ValueError, OSError, json.JSONDecodeError) as exc:
             message = f"pyperformance execution failed ({exc})"
-            if target.key == "cpython":
-                if pyperformance_bootstrap_tempdir is not None:
-                    pyperformance_bootstrap_tempdir.cleanup()
-                raise ValueError(
-                    f"Failed to execute pyperformance baseline runtime: {exc}"
-                ) from exc
             skipped_runtimes.append(f"{target.key}: {message}")
             payload = {
                 "suite": PYPERFORMANCE_SUITE,
@@ -3538,10 +3721,6 @@ def run_pyperformance_suite(
 
         if not normalized_rows:
             message = "pyperformance run completed but no benchmark rows were parsed"
-            if target.key == "cpython":
-                if pyperformance_bootstrap_tempdir is not None:
-                    pyperformance_bootstrap_tempdir.cleanup()
-                raise ValueError(message)
             skipped_runtimes.append(f"{target.key}: {message}")
             payload = {
                 "suite": PYPERFORMANCE_SUITE,
@@ -3610,7 +3789,15 @@ def run_pyperformance_suite(
             "runtime_version": runtime_version,
             "runtime_details": runtime_details,
             "pyperformance_command": command,
+            "pyperformance_commands": command_invocations,
             "pyperformance_raw_output": str(raw_report_path),
+            "pyperformance_resume_enabled": pyperformance_resume_incomplete,
+            "pyperformance_resume_checkpoint": None
+            if resume_checkpoint_path is None
+            else str(resume_checkpoint_path),
+            "pyperformance_resume_benchmark_universe": target_benchmark_universe,
+            "pyperformance_resume_remaining_benchmarks": remaining_benchmarks,
+            "pyperformance_resume_failures": runtime_execution_failures,
             "startup_samples_seconds": startup_values,
             "startup_mean_seconds": startup_mean,
             "startup_stdev_seconds": startup_stdev,
@@ -3630,15 +3817,36 @@ def run_pyperformance_suite(
                 "startup_mean_seconds": startup_mean,
                 "startup_stdev_seconds": startup_stdev,
                 "jit_audit": jit_audit_summary,
+                "execution_failures": runtime_execution_failures,
                 "executed": True,
             }
         )
+        if runtime_execution_failures:
+            skipped_runtimes.append(
+                f"{target.key}: completed with benchmark-level failures "
+                f"({len(runtime_execution_failures)} issue(s)); see runtime payload."
+            )
 
     if pyperformance_bootstrap_tempdir is not None:
         pyperformance_bootstrap_tempdir.cleanup()
 
     if not runtime_case_means:
         raise ValueError("No pyperformance runtime completed successfully.")
+
+    if require_cinderx_baseline:
+        cinderx_executed = any(
+            bool(item.get("executed")) and item.get("runtime") == "cpython-cinderx"
+            for item in runtime_summaries
+        )
+        if not cinderx_executed:
+            cinderx_failure = next(
+                (entry for entry in skipped_runtimes if entry.startswith("cpython-cinderx:")),
+                "cpython-cinderx runtime did not execute successfully.",
+            )
+            raise ValueError(
+                "Required CinderX baseline runtime did not complete during pyperformance run. "
+                f"{cinderx_failure}"
+            )
 
     baseline_runtime = _select_baseline_runtime(runtime_case_means)
     _apply_baseline_metrics(
@@ -3718,6 +3926,11 @@ def run_pyperformance_suite(
         notes.append(
             "Selected profile requires strict loader stubs; missing stubs now fail fast "
             "(no silent static-loader downgrade)."
+        )
+    if pyperformance_resume_incomplete:
+        notes.append(
+            "Pyperformance resume mode was enabled: benchmarks executed in batches and "
+            "checkpointed with --append to recover from interruptions."
         )
     if baseline_runtime != "cpython-cinderx":
         notes.append(

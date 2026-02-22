@@ -249,6 +249,25 @@ def bench_run(
             ),
         ),
     ] = None,
+    pyperformance_resume_incomplete: Annotated[
+        bool,
+        typer.Option(
+            help=(
+                "Enable resumable pyperformance execution using --append checkpoints and "
+                "batched benchmark invocations."
+            ),
+        ),
+    ] = False,
+    pyperformance_resume_batch_size: Annotated[
+        int,
+        typer.Option(
+            min=1,
+            help=(
+                "Batch size used when --pyperformance-resume-incomplete is enabled. "
+                "Each batch is executed as a separate pyperformance invocation."
+            ),
+        ),
+    ] = 12,
 ) -> None:
     """Run benchmark suites or print execution plans for not-yet-automated suites."""
     runnable_suites = {SMOKE_SUITE, PYPERFORMANCE_SUITE}
@@ -293,6 +312,8 @@ def bench_run(
                     pyperformance_bootstrap_jit_compile_after_n_calls
                 ),
                 pyperformance_runtime_timeout_seconds=pyperformance_runtime_timeout_seconds,
+                pyperformance_resume_incomplete=pyperformance_resume_incomplete,
+                pyperformance_resume_batch_size=pyperformance_resume_batch_size,
             )
     except ValueError as exc:
         typer.echo(str(exc), err=True)

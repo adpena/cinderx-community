@@ -209,6 +209,8 @@ jobs:
             --require-cinderx-baseline \
             --pyperformance-bootstrap-profile cinderx-jit-all \
             --pyperformance-runtime-timeout-seconds 14400 \
+            --pyperformance-resume-incomplete \
+            --pyperformance-resume-batch-size 12 \
             --out data/runs \
             --summary-out data/summary \
             --static-summary-out packages/site/static/data/summary
