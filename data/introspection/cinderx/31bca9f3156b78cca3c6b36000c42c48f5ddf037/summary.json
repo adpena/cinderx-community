@@ -12,9 +12,9 @@
     "C/C++ symbol extraction uses regex fallback rather than full Clang AST parsing.",
     "Test runtime requirements are inferred from textual patterns."
   ],
-  "output_dir": "/Users/adpena/PycharmProjects/cinderx-community/data/introspection/cinderx/31bca9f3156b78cca3c6b36000c42c48f5ddf037",
+  "output_dir": "data/introspection/cinderx/31bca9f3156b78cca3c6b36000c42c48f5ddf037",
   "provenance_banner": "Built from cinderx @ 31bca9f3156b78cca3c6b36000c42c48f5ddf037",
   "repo": "cinderx",
-  "repo_path": "/Users/adpena/PycharmProjects/cinderx-community/.cache/upstream/cinderx",
+  "repo_path": ".cache/upstream/cinderx",
   "repo_url": "https://github.com/facebookincubator/cinderx.git"
 }

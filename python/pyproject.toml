@@ -9,6 +9,10 @@ description = "Community tooling scaffold for CinderX docs, compatibility, and b
 readme = "README.md"
 requires-python = ">=3.14"
 authors = [{ name = "CinderX Community Contributors" }]
+license = { file = "../LICENSE" }
+classifiers = [
+  "License :: OSI Approved :: Apache Software License"
+]
 dependencies = [
   "typer>=0.24.0"
 ]

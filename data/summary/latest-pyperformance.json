@@ -105,7 +105,7 @@
         "repo_url": "https://github.com/facebookincubator/cinderx.git"
       },
       "pyperformance_command": [
-        "/Users/adpena/PycharmProjects/cinderx-community/.venv/bin/python",
+        ".venv/bin/python",
         "-m",
         "pyperformance"
       ],

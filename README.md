@@ -340,4 +340,4 @@ make bench-dossier-smoke
 
 ## License
 
-MIT (see `LICENSE`).
+Apache License 2.0. See [LICENSE](LICENSE).
